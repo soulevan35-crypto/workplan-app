@@ -1,0 +1,1430 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>ระบบแผนงานรวม</title>
+<link href="https://fonts.googleapis.com/css2?family=Sarabun:wght@300;400;500;600;700&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+:root {
+  --bg:#0f1117;--bg2:#181c27;--bg3:#1e2235;--surface:#252a3a;--surface2:#2e3448;
+  --border:#363c52;--border2:#444c65;--text:#e8eaf2;--text2:#9ba3bf;--text3:#6b7494;
+  --accent:#4f8ef7;--accent2:#3a6fd4;--green:#34c98a;--amber:#f5a623;--red:#f05a5a;
+  --purple:#9b6ef3;--teal:#2ec4b6;--radius:10px;--radius-sm:6px;
+}
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:'Sarabun',sans-serif;background:var(--bg);color:var(--text);min-height:100vh;font-size:14px;line-height:1.6}
+#sidebar{position:fixed;top:0;left:0;bottom:0;width:220px;background:var(--bg2);border-right:1px solid var(--border);display:flex;flex-direction:column;z-index:100}
+.sidebar-logo{padding:16px 20px;border-bottom:1px solid var(--border);display:flex;align-items:center;gap:10px}
+.logo-icon{width:32px;height:32px;background:var(--accent);border-radius:8px;display:flex;align-items:center;justify-content:center;font-size:16px;flex-shrink:0}
+.logo-sub{font-size:9px;color:var(--text3);display:block;line-height:1;font-family:'IBM Plex Mono',monospace;margin-top:2px}
+nav{flex:1;padding:8px 0;overflow-y:auto}
+.nav-section{font-size:10px;font-weight:600;color:var(--text3);text-transform:uppercase;letter-spacing:1px;padding:10px 20px 4px}
+.nav-item{display:flex;align-items:center;gap:10px;padding:9px 20px;cursor:pointer;color:var(--text2);font-size:14px;transition:background .15s,color .15s;position:relative;user-select:none}
+.nav-item:hover{background:var(--surface);color:var(--text)}
+.nav-item.active{background:var(--surface);color:var(--accent);font-weight:600}
+.nav-item.active::before{content:'';position:absolute;left:0;top:25%;bottom:25%;width:3px;background:var(--accent);border-radius:0 3px 3px 0}
+.nav-icon{font-size:15px;width:20px;text-align:center}
+.sync-bar{padding:10px 14px;border-top:1px solid var(--border)}
+.sync-status{display:flex;align-items:center;gap:6px;padding:6px 10px;border-radius:var(--radius-sm);background:var(--surface);font-size:12px}
+.sync-dot{width:7px;height:7px;border-radius:50%;flex-shrink:0}
+.sync-ok .sync-dot{background:var(--green)}
+.sync-saving .sync-dot{background:var(--amber);animation:pulse .8s infinite}
+.sync-err .sync-dot{background:var(--red)}
+.sync-offline .sync-dot{background:var(--text3)}
+@keyframes pulse{0%,100%{opacity:1}50%{opacity:.3}}
+.month-nav{padding:12px 16px;border-top:1px solid var(--border)}
+.month-nav label{font-size:10px;color:var(--text3);display:block;margin-bottom:5px;letter-spacing:.5px}
+.month-display{display:flex;align-items:center;justify-content:space-between;background:var(--surface);border-radius:var(--radius-sm);padding:5px 8px}
+.month-display span{font-size:13px;font-weight:600}
+.month-btn{background:none;border:none;color:var(--text2);cursor:pointer;font-size:15px;padding:2px 5px;border-radius:4px}
+.month-btn:hover{color:var(--text);background:var(--border)}
+#main{margin-left:220px;min-height:100vh;display:flex;flex-direction:column}
+.topbar{position:sticky;top:0;z-index:50;background:var(--bg2);border-bottom:1px solid var(--border);padding:0 24px;display:flex;align-items:center;justify-content:space-between;height:54px}
+.topbar-title{font-size:16px;font-weight:700}
+.topbar-actions{display:flex;gap:8px}
+.btn{display:inline-flex;align-items:center;gap:6px;padding:7px 14px;border-radius:var(--radius-sm);font-family:'Sarabun',sans-serif;font-size:13px;font-weight:600;cursor:pointer;border:none;transition:all .15s}
+.btn-primary{background:var(--accent);color:#fff}.btn-primary:hover{background:var(--accent2)}
+.btn-ghost{background:var(--surface);color:var(--text2);border:1px solid var(--border)}.btn-ghost:hover{border-color:var(--border2);color:var(--text)}
+.btn-danger{background:rgba(240,90,90,.15);color:var(--red);border:1px solid rgba(240,90,90,.3)}.btn-danger:hover{background:rgba(240,90,90,.25)}
+.btn-sm{padding:4px 10px;font-size:12px}
+#content{flex:1;padding:20px 24px}
+.view{display:none}.view.active{display:block}
+.cal-header{display:grid;grid-template-columns:repeat(7,1fr);gap:2px;margin-bottom:2px}
+.cal-dow{text-align:center;font-size:11px;font-weight:600;color:var(--text3);padding:8px 0;letter-spacing:.5px}
+.cal-grid{display:grid;grid-template-columns:repeat(7,1fr);gap:2px}
+.cal-cell{background:var(--bg2);border-radius:var(--radius-sm);border:1px solid var(--border);min-height:108px;padding:7px 7px 24px;cursor:pointer;transition:border-color .15s;overflow:hidden;position:relative}
+.cal-cell:hover{border-color:var(--border2)}
+.cal-cell.other-month{opacity:.25}
+.cal-cell.today{border-color:var(--accent)}
+.cal-cell.weekend{background:#14182a}
+.cal-cell.holiday{background:#1d1428}
+.cal-day-num{font-size:12px;font-weight:700;margin-bottom:4px;display:flex;align-items:center;justify-content:space-between}
+.today .cal-day-num .dn{background:var(--accent);color:#fff;width:21px;height:21px;border-radius:50%;display:inline-flex;align-items:center;justify-content:center}
+.holiday-label{font-size:9px;color:#c084fc;font-weight:600}
+.cal-jobs{display:flex;flex-direction:column;gap:2px}
+.cal-job-pill{font-size:10px;font-weight:600;padding:2px 5px;border-radius:3px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;cursor:pointer;transition:opacity .1s;border-left:2px solid}
+.cal-job-pill:hover{opacity:.75}
+.cal-more{font-size:10px;color:var(--text3);padding:1px 0}
+.add-job-inline{position:absolute;bottom:4px;right:4px;width:20px;height:20px;border-radius:50%;background:var(--surface2);border:1px solid var(--border2);color:var(--text3);font-size:16px;display:none;align-items:center;justify-content:center;cursor:pointer;transition:all .15s;line-height:1}
+.cal-cell:hover .add-job-inline{display:flex}
+.add-job-inline:hover{background:var(--accent);border-color:var(--accent);color:#fff}
+.stats-row{display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin-bottom:18px}
+.stat-card{background:var(--bg2);border:1px solid var(--border);border-radius:var(--radius);padding:14px 16px}
+.stat-label{font-size:10px;color:var(--text3);font-weight:600;text-transform:uppercase;letter-spacing:.5px;margin-bottom:3px}
+.stat-value{font-size:24px;font-weight:700;line-height:1}
+.stat-sub{font-size:11px;color:var(--text3);margin-top:2px}
+.emp-table{width:100%;border-collapse:collapse}
+.emp-table th{text-align:left;font-size:11px;font-weight:600;color:var(--text3);text-transform:uppercase;letter-spacing:.5px;padding:9px 13px;border-bottom:1px solid var(--border)}
+.emp-table td{padding:9px 13px;border-bottom:1px solid var(--border);vertical-align:top}
+.emp-table tr:hover td{background:var(--surface)}
+.day-chips{display:flex;flex-wrap:wrap;gap:3px}
+.day-chip{background:var(--surface);border:1px solid var(--border);border-radius:4px;padding:1px 5px;font-size:11px}
+.workload-bar{height:3px;border-radius:2px;background:var(--border);margin-top:4px}
+.workload-fill{height:100%;border-radius:2px}
+.veh-list-wrap{background:var(--bg2);border:1px solid var(--border);border-radius:var(--radius);overflow:hidden}
+.veh-day-row{display:grid;grid-template-columns:72px 1fr;border-bottom:1px solid var(--border)}
+.veh-day-row:last-child{border-bottom:none}
+.veh-day-label{padding:9px 12px;background:var(--bg3);font-size:12px;font-weight:700;color:var(--text2);border-right:1px solid var(--border);display:flex;align-items:center}
+.veh-day-jobs{padding:6px 10px;display:flex;flex-wrap:wrap;gap:5px;align-items:center}
+.veh-usage-chip{display:flex;align-items:center;gap:5px;background:var(--surface);border:1px solid var(--border);border-radius:5px;padding:4px 8px;font-size:12px}
+.master-tabs{display:flex;gap:4px;margin-bottom:18px}
+.master-tab{padding:7px 16px;border-radius:var(--radius-sm);cursor:pointer;font-size:13px;font-weight:600;background:var(--surface);color:var(--text2);border:1px solid var(--border);transition:all .15s}
+.master-tab.active{background:var(--accent);color:#fff;border-color:var(--accent)}
+.master-section{display:none}.master-section.active{display:block}
+.data-table-wrap{background:var(--bg2);border:1px solid var(--border);border-radius:var(--radius);overflow:hidden}
+.data-table{width:100%;border-collapse:collapse}
+.data-table th{text-align:left;font-size:11px;font-weight:600;color:var(--text3);text-transform:uppercase;letter-spacing:.5px;padding:9px 13px;border-bottom:1px solid var(--border);background:var(--bg2)}
+.data-table td{padding:9px 13px;border-bottom:1px solid var(--border)}
+.data-table tr:last-child td{border-bottom:none}
+.data-table tr:hover td{background:rgba(255,255,255,.02)}
+.section-header{display:flex;align-items:center;justify-content:space-between;margin-bottom:13px;gap:10px;flex-wrap:wrap}
+.section-title{font-size:15px;font-weight:700}
+.filter-row{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+.type-filter-btn{padding:4px 12px;border-radius:20px;font-size:12px;font-weight:700;cursor:pointer;border:1.5px solid;transition:all .15s;background:transparent;font-family:'Sarabun',sans-serif}
+.day-panel{position:fixed;right:0;top:0;bottom:0;width:370px;background:var(--bg2);border-left:1px solid var(--border);z-index:90;transform:translateX(100%);transition:transform .22s ease;display:flex;flex-direction:column}
+.day-panel.open{transform:translateX(0)}
+.day-panel-header{padding:16px 18px;border-bottom:1px solid var(--border);display:flex;align-items:flex-start;justify-content:space-between}
+.day-panel-title{font-size:17px;font-weight:700}
+.day-panel-sub{font-size:12px;color:var(--text3);margin-top:1px}
+.day-panel-body{flex:1;overflow-y:auto;padding:14px 16px}
+.day-job-card{background:var(--bg3);border:1px solid var(--border);border-radius:var(--radius);padding:11px 13px;margin-bottom:9px;border-left:3px solid}
+.day-job-code{font-family:'IBM Plex Mono',monospace;font-size:11px;color:var(--text3)}
+.day-job-name{font-size:14px;font-weight:600;margin:3px 0}
+.day-job-meta{display:flex;flex-wrap:wrap;gap:5px;margin-top:5px}
+.meta-chip{font-size:11px;display:flex;align-items:center;gap:4px;background:var(--surface);border-radius:4px;padding:2px 7px;color:var(--text2)}
+.day-panel-footer{padding:12px 16px;border-top:1px solid var(--border)}
+.modal-overlay{position:fixed;inset:0;background:rgba(0,0,0,.7);backdrop-filter:blur(4px);display:none;align-items:center;justify-content:center;z-index:200}
+.modal-overlay.open{display:flex}
+.modal{background:var(--bg2);border:1px solid var(--border2);border-radius:14px;width:520px;max-width:95vw;max-height:90vh;overflow-y:auto;box-shadow:0 24px 80px rgba(0,0,0,.6);animation:slideUp .2s ease}
+@keyframes slideUp{from{transform:translateY(16px);opacity:0}to{transform:translateY(0);opacity:1}}
+.modal-header{padding:18px 22px 14px;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between}
+.modal-header h2{font-size:16px;font-weight:700}
+.modal-close{background:none;border:none;color:var(--text3);cursor:pointer;font-size:20px;line-height:1}.modal-close:hover{color:var(--text)}
+.modal-body{padding:18px 22px}
+.modal-footer{padding:14px 22px;border-top:1px solid var(--border);display:flex;justify-content:flex-end;gap:8px}
+.form-group{margin-bottom:14px}
+.form-label{font-size:12px;font-weight:600;color:var(--text2);margin-bottom:5px;display:block;letter-spacing:.3px}
+.form-input,.form-select,.form-textarea{width:100%;background:var(--bg3);border:1px solid var(--border);border-radius:var(--radius-sm);padding:8px 11px;color:var(--text);font-family:'Sarabun',sans-serif;font-size:14px;outline:none;transition:border-color .15s}
+.form-input:focus,.form-select:focus,.form-textarea:focus{border-color:var(--accent)}
+.form-textarea{resize:vertical;min-height:64px}
+.form-select option{background:var(--bg2)}
+.form-row{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+.emp-select-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:5px;max-height:170px;overflow-y:auto}
+.emp-check{display:flex;align-items:center;gap:6px;background:var(--bg3);border:1px solid var(--border);border-radius:5px;padding:5px 8px;cursor:pointer;transition:border-color .15s;font-size:12px}
+.emp-check input{accent-color:var(--accent)}
+.emp-check:has(input:checked){border-color:var(--accent);background:rgba(79,142,247,.1)}
+.job-search-list{max-height:170px;overflow-y:auto;background:var(--bg3);border:1px solid var(--border);border-radius:var(--radius-sm)}
+.job-search-item{padding:8px 12px;cursor:pointer;display:flex;align-items:center;gap:8px;border-bottom:1px solid var(--border);transition:background .1s;font-size:13px}
+.job-search-item:last-child{border-bottom:none}
+.job-search-item:hover{background:var(--surface)}
+.job-code-badge{font-family:'IBM Plex Mono',monospace;font-size:10px;background:var(--surface2);border:1px solid var(--border2);border-radius:4px;padding:1px 5px;flex-shrink:0}
+.job-type-badge{font-size:10px;font-weight:700;padding:1px 5px;border-radius:3px;flex-shrink:0}
+.type-S{background:rgba(79,142,247,.2);color:#7ab3ff}
+.type-W{background:rgba(52,201,138,.2);color:#5ddba8}
+.type-F{background:rgba(245,166,35,.2);color:#f8c060}
+.type-E{background:rgba(240,90,90,.2);color:#ff8a8a}
+.type-M{background:rgba(155,110,243,.2);color:#c4a2ff}
+.conflict-banner{background:rgba(240,90,90,.1);border:1px solid rgba(240,90,90,.3);border-radius:var(--radius-sm);padding:8px 12px;font-size:12px;color:var(--red);margin-bottom:12px;display:none}
+.conflict-banner.show{display:block}
+.sel-job-box{background:var(--bg3);border:1px solid var(--border);border-radius:var(--radius-sm);padding:9px 12px;margin-bottom:12px;display:none}
+.tag{display:inline-block;border-radius:4px;padding:2px 7px;font-size:11px;font-weight:600}
+.tag-active{background:rgba(52,201,138,.15);color:var(--green)}
+.tag-inactive{background:var(--surface);color:var(--text3)}
+.tag-planned{background:rgba(79,142,247,.15);color:var(--accent)}
+.tag-unplanned{background:rgba(245,166,35,.15);color:var(--amber)}
+.team-dot{width:8px;height:8px;border-radius:50%;display:inline-block;flex-shrink:0}
+::-webkit-scrollbar{width:5px;height:5px}
+::-webkit-scrollbar-track{background:transparent}
+::-webkit-scrollbar-thumb{background:var(--border2);border-radius:3px}
+#toast{position:fixed;bottom:24px;left:50%;transform:translateX(-50%) translateY(80px);background:var(--surface2);border:1px solid var(--border2);border-radius:8px;padding:10px 20px;font-size:13px;z-index:999;transition:transform .25s ease;pointer-events:none;white-space:nowrap}
+#toast.show{transform:translateX(-50%) translateY(0)}
+#toast.toast-ok{border-color:rgba(52,201,138,.4);color:var(--green)}
+#toast.toast-err{border-color:rgba(240,90,90,.4);color:var(--red)}
+.setup-screen{display:flex;align-items:center;justify-content:center;min-height:100vh}
+.setup-card{background:var(--bg2);border:1px solid var(--border);border-radius:16px;padding:36px 40px;width:420px;text-align:center}
+.setup-card h1{font-size:22px;font-weight:700;margin-bottom:8px}
+.setup-card p{color:var(--text2);font-size:14px;margin-bottom:24px}
+.setup-or{color:var(--text3);font-size:13px;margin:14px 0}
+</style>
+</head>
+<body>
+
+<div id="setupScreen" class="setup-screen" style="display:none">
+  <div class="setup-card" style="width:500px;max-width:96vw">
+    <div style="font-size:38px;margin-bottom:10px">📋</div>
+    <h1>ระบบแผนงานรวม</h1>
+    <p style="margin-bottom:20px">ซิงค์ข้อมูลผ่าน Google Apps Script<br>ทีมใช้ Script URL + Room ID เดียวกัน</p>
+
+    <!-- Step guide -->
+    <div style="background:var(--bg3);border:1px solid var(--border);border-radius:10px;padding:16px 18px;text-align:left;margin-bottom:16px;font-size:12px;color:var(--text2)">
+      <div style="font-weight:700;color:var(--accent);margin-bottom:10px">📌 วิธีตั้งค่าครั้งแรก (ทำครั้งเดียว)</div>
+      <div style="display:flex;flex-direction:column;gap:6px">
+        <div><span style="background:var(--accent);color:#fff;border-radius:50%;width:18px;height:18px;display:inline-flex;align-items:center;justify-content:center;font-size:10px;font-weight:700;margin-right:6px">1</span>เปิด <a href="https://script.google.com" target="_blank" style="color:var(--accent)">script.google.com</a> → New project</div>
+        <div><span style="background:var(--accent);color:#fff;border-radius:50%;width:18px;height:18px;display:inline-flex;align-items:center;justify-content:center;font-size:10px;font-weight:700;margin-right:6px">2</span>วางโค้ด Apps Script แล้ว Save (ดาวน์โหลดจากไฟล์ที่แนบ)</div>
+        <div><span style="background:var(--accent);color:#fff;border-radius:50%;width:18px;height:18px;display:inline-flex;align-items:center;justify-content:center;font-size:10px;font-weight:700;margin-right:6px">3</span>Deploy → New deployment → Web app → Execute as: <b>Me</b> / Access: <b>Anyone</b></div>
+        <div><span style="background:var(--accent);color:#fff;border-radius:50%;width:18px;height:18px;display:inline-flex;align-items:center;justify-content:center;font-size:10px;font-weight:700;margin-right:6px">4</span>Copy <b>Web app URL</b> มาใส่ด้านล่าง แล้วแชร์ให้ทีม</div>
+      </div>
+    </div>
+
+    <div style="background:var(--bg3);border:1px solid var(--border);border-radius:10px;padding:16px 18px;text-align:left;margin-bottom:14px">
+      <div class="form-group">
+        <label class="form-label">Script URL (Web app URL จาก Deploy)</label>
+        <input class="form-input" id="setupScriptUrl" placeholder="https://script.google.com/macros/s/AKfy.../exec" style="font-size:12px">
+      </div>
+      <div class="form-group" style="margin-bottom:0">
+        <label class="form-label">Room ID <span style="color:var(--text3);font-weight:400">(ตั้งชื่อห้องข้อมูลของทีม)</span></label>
+        <input class="form-input" id="setupRoomId" placeholder="เช่น swfe-team-2026" style="font-family:'IBM Plex Mono',monospace">
+        <div style="font-size:11px;color:var(--text3);margin-top:4px">ทีมเดียวกัน ใช้ Room ID เดียวกัน — ข้อมูลจะซิงค์กัน</div>
+      </div>
+    </div>
+
+    <button class="btn btn-primary" style="width:100%;justify-content:center;font-size:14px;padding:10px" onclick="setupConnect()">🔗 เชื่อมต่อและเริ่มใช้งาน</button>
+    <div class="setup-or">— หรือ —</div>
+    <button class="btn btn-ghost" style="width:100%;justify-content:center;margin-top:8px" onclick="setupOffline()">💾 ใช้งานแบบออฟไลน์ (เก็บเฉพาะในเครื่อง)</button>
+  </div>
+</div>
+
+<div id="appRoot" style="display:none">
+<div id="sidebar">
+  <div class="sidebar-logo">
+    <div class="logo-icon">📋</div>
+    <div>
+      <span style="font-size:14px;font-weight:700">แผนงานรวม</span>
+      <span class="logo-sub" id="syncConnDisplay" style="cursor:pointer" onclick="openScriptSettings()" title="คลิกตั้งค่า Script">LOCAL ⚙</span>
+    </div>
+  </div>
+  <nav>
+    <div class="nav-section">หน้าหลัก</div>
+    <div class="nav-item active" id="nav-calendar" onclick="showView('calendar',this)"><span class="nav-icon">📅</span>ปฏิทินแผนงาน</div>
+    <div class="nav-item" id="nav-employees" onclick="showView('employees',this)"><span class="nav-icon">👥</span>รายพนักงาน</div>
+    <div class="nav-item" id="nav-vehicles" onclick="showView('vehicles',this)"><span class="nav-icon">🚗</span>รายรถ</div>
+    <div class="nav-section">ข้อมูล</div>
+    <div class="nav-item" id="nav-master" onclick="showView('master',this)"><span class="nav-icon">⚙️</span>จัดการข้อมูล</div>
+  </nav>
+  <div class="sync-bar">
+    <div class="sync-status sync-offline" id="syncStatus">
+      <div class="sync-dot"></div>
+      <span id="syncLabel">ออฟไลน์</span>
+    </div>
+    <div style="display:flex;gap:4px;margin-top:6px">
+      <button class="btn btn-ghost btn-sm" style="flex:1;justify-content:center" onclick="manualSync()">🔄 ซิงค์</button>
+      <button class="btn btn-ghost btn-sm" style="flex:1;justify-content:center" onclick="openScriptSettings()">⚙ ตั้งค่า</button>
+    </div>
+  </div>
+  <div class="month-nav">
+    <label>เดือนที่แสดง</label>
+    <div class="month-display">
+      <button class="month-btn" onclick="changeMonth(-1)">‹</button>
+      <span id="monthLabel"></span>
+      <button class="month-btn" onclick="changeMonth(1)">›</button>
+    </div>
+  </div>
+</div>
+
+<div id="main">
+  <div class="topbar">
+    <div class="topbar-title" id="viewTitle">📅 ปฏิทินแผนงาน</div>
+    <div class="topbar-actions">
+      <button class="btn btn-ghost" id="btnAddJob" onclick="openAddJobModal(null)">+ เพิ่มงาน</button>
+      <button class="btn btn-primary" onclick="openCopyPlanModal()">📋 คัดลอกแผน</button>
+    </div>
+  </div>
+  <div id="content">
+
+    <div class="view active" id="view-calendar">
+      <div class="stats-row" id="statsRow"></div>
+      <div id="typeLegend" style="display:flex;gap:10px;flex-wrap:wrap;margin-bottom:12px;font-size:11px;color:var(--text3)">
+        <span><span class="job-type-badge type-S">S</span> Site (ติดตั้ง)</span>
+        <span><span class="job-type-badge type-W">W</span> Water (น้ำ/ระบบน้ำ)</span>
+        <span><span class="job-type-badge type-F">F</span> Factory (โรงงาน)</span>
+        <span><span class="job-type-badge type-E">E</span> EIA</span>
+        <span><span class="job-type-badge type-M">M</span> Mining (เหมือง)</span>
+      </div>
+      <div class="cal-header">
+        <div class="cal-dow">จันทร์</div><div class="cal-dow">อังคาร</div>
+        <div class="cal-dow">พุธ</div><div class="cal-dow">พฤหัส</div>
+        <div class="cal-dow">ศุกร์</div>
+        <div class="cal-dow" style="color:var(--purple)">เสาร์</div>
+        <div class="cal-dow" style="color:var(--red)">อาทิตย์</div>
+      </div>
+      <div class="cal-grid" id="calGrid"></div>
+    </div>
+
+    <div class="view" id="view-employees">
+      <div class="section-header">
+        <div class="section-title">ภาระงานรายพนักงาน — <span id="empMonthLabel"></span></div>
+        <input class="form-input" style="width:200px" placeholder="🔍 ค้นหา..." oninput="filterEmpTable(this.value)">
+      </div>
+      <div class="data-table-wrap">
+        <table class="emp-table">
+          <thead><tr>
+            <th>พนักงาน (คลิกดูรายละเอียด)</th>
+            <th>วันที่มีงาน (คลิกวันดูงาน)</th>
+            <th style="text-align:center">วันทำงาน</th>
+          </tr></thead>
+          <tbody id="empTableBody"></tbody>
+        </table>
+      </div>
+    </div>
+
+    <div class="view" id="view-vehicles">
+      <div class="section-header">
+        <div class="section-title">รายรถ — <span id="vehMonthLabel"></span></div>
+        <div style="display:flex;gap:8px;align-items:center">
+          <select class="form-select" style="width:200px" id="vehFilter" onchange="renderVehicles()">
+            <option value="">— ทุกทะเบียน —</option>
+          </select>
+          <button class="btn btn-ghost" onclick="openAddVehicleModal()">+ เพิ่มรถ</button>
+        </div>
+      </div>
+      <div id="vehicleListWrap"></div>
+    </div>
+
+    <div class="view" id="view-master">
+      <div class="master-tabs">
+        <div class="master-tab active" onclick="switchMasterTab('jobs')">📦 รายการงาน</div>
+        <div class="master-tab" onclick="switchMasterTab('employees')">👤 พนักงาน</div>
+        <div class="master-tab" onclick="switchMasterTab('vehicles')">🚗 รถยนต์</div>
+      </div>
+      <div class="master-section active" id="master-jobs">
+        <div class="section-header">
+          <div class="section-title">รายการงานทั้งหมด</div>
+          <div class="filter-row">
+            <div id="typeFilterBtns" style="display:flex;gap:5px"></div>
+            <input class="form-input" style="width:180px" placeholder="🔍 ค้นหา..." id="jobSearchFilter" oninput="renderMasterJobs()">
+            <button class="btn btn-primary" onclick="openAddMasterJobModal()">+ เพิ่มงาน</button>
+          </div>
+        </div>
+        <div class="data-table-wrap">
+          <table class="data-table">
+            <thead><tr><th>รหัสงาน</th><th>ชื่องาน / สถานที่</th><th>ประเภท</th><th>สถานะวางแผน</th><th></th></tr></thead>
+            <tbody id="masterJobsBody"></tbody>
+          </table>
+        </div>
+      </div>
+      <div class="master-section" id="master-employees">
+        <div class="section-header">
+          <div class="section-title">รายชื่อพนักงาน</div>
+          <button class="btn btn-primary" onclick="openAddEmpModal()">+ เพิ่มพนักงาน</button>
+        </div>
+        <div class="data-table-wrap">
+          <table class="data-table">
+            <thead><tr><th>ชื่อ</th><th>ทีม</th><th>สถานะ</th><th></th></tr></thead>
+            <tbody id="masterEmpBody"></tbody>
+          </table>
+        </div>
+      </div>
+      <div class="master-section" id="master-vehicles">
+        <div class="section-header">
+          <div class="section-title">ทะเบียนรถ</div>
+          <button class="btn btn-primary" onclick="openAddVehicleModal()">+ เพิ่มรถ</button>
+        </div>
+        <div class="data-table-wrap">
+          <table class="data-table">
+            <thead><tr><th>ทะเบียน</th><th>ประเภท</th><th>ทีม</th><th>สถานะ</th><th></th></tr></thead>
+            <tbody id="masterVehBody"></tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+
+  </div>
+</div>
+
+<div class="day-panel" id="dayPanel">
+  <div class="day-panel-header">
+    <div>
+      <div class="day-panel-title" id="panelTitle"></div>
+      <div class="day-panel-sub" id="panelSub"></div>
+    </div>
+    <button class="modal-close" onclick="closeDayPanel()">✕</button>
+  </div>
+  <div class="day-panel-body" id="panelBody"></div>
+  <div class="day-panel-footer">
+    <button class="btn btn-primary" style="width:100%;justify-content:center" id="panelAddBtn">+ เพิ่มงานวันนี้</button>
+  </div>
+</div>
+</div><!-- appRoot -->
+
+<!-- ADD / EDIT JOB MODAL -->
+<div class="modal-overlay" id="addJobModal">
+  <div class="modal">
+    <div class="modal-header">
+      <h2 id="addJobTitle">➕ เพิ่มงานลงแผน</h2>
+      <button class="modal-close" onclick="closeModal('addJobModal')">✕</button>
+    </div>
+    <div class="modal-body">
+      <div class="conflict-banner" id="conflictBanner">⚠️ <span id="conflictMsg"></span></div>
+      <div class="form-group">
+        <label class="form-label">ค้นหา / เลือกจากรายการงาน</label>
+        <input class="form-input" id="jobSearchInput" placeholder="พิมพ์รหัสหรือชื่องาน..." oninput="filterJobSearch(this.value)">
+        <div class="job-search-list" id="jobSearchList" style="margin-top:5px"></div>
+      </div>
+      <div class="sel-job-box" id="selJobBox">
+        <div style="font-size:11px;color:var(--text3)" id="selJobCode"></div>
+        <div style="font-weight:700;font-size:14px" id="selJobName"></div>
+        <div style="font-size:11px;color:var(--text3);margin-top:2px" id="selJobTypeDisp"></div>
+      </div>
+      <div class="form-row">
+        <div class="form-group">
+          <label class="form-label">วันที่เริ่ม</label>
+          <input type="date" class="form-input" id="jobStartDate">
+        </div>
+        <div class="form-group">
+          <label class="form-label">จำนวนวัน</label>
+          <input type="number" class="form-input" id="jobDays" value="1" min="1" max="180">
+        </div>
+      </div>
+      <div class="form-row">
+        <div class="form-group">
+          <label class="form-label">ประเภทงาน</label>
+          <select class="form-select" id="jobType">
+            <option value="">— เลือก —</option>
+            <option value="S">S — Site (ติดตั้ง)</option>
+            <option value="W">W — Water (น้ำ)</option>
+            <option value="F">F — Factory (โรงงาน)</option>
+            <option value="E">E — EIA</option>
+            <option value="M">M — Mining (เหมือง)</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label class="form-label">ทีม</label>
+          <select class="form-select" id="jobTeam"></select>
+        </div>
+      </div>
+      <div class="form-group">
+        <label class="form-label">พนักงานที่รับผิดชอบ</label>
+        <div class="emp-select-grid" id="empSelectGrid"></div>
+      </div>
+      <div class="form-group">
+        <label class="form-label">รถที่ใช้</label>
+        <select class="form-select" id="jobVehicle"></select>
+      </div>
+      <div class="form-group">
+        <label class="form-label">หมายเหตุ</label>
+        <textarea class="form-textarea" id="jobNote" placeholder="เช่น นัดแล้ว 10:00, ก่อนเที่ยง..."></textarea>
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-ghost" onclick="closeModal('addJobModal')">ยกเลิก</button>
+      <button class="btn btn-primary" onclick="saveJob()">💾 บันทึก</button>
+    </div>
+  </div>
+</div>
+
+<!-- ADD MASTER JOB -->
+<div class="modal-overlay" id="addMasterJobModal">
+  <div class="modal">
+    <div class="modal-header">
+      <h2>📦 เพิ่มรายการงานใหม่</h2>
+      <button class="modal-close" onclick="closeModal('addMasterJobModal')">✕</button>
+    </div>
+    <div class="modal-body">
+      <div class="form-row">
+        <div class="form-group">
+          <label class="form-label">รหัสงาน</label>
+          <input class="form-input" id="mjCode" placeholder="เช่น S69020">
+        </div>
+        <div class="form-group">
+          <label class="form-label">ประเภท</label>
+          <select class="form-select" id="mjType">
+            <option value="S">S — Site</option>
+            <option value="W">W — Water</option>
+            <option value="F">F — Factory</option>
+            <option value="E">E — EIA</option>
+            <option value="M">M — Mining</option>
+          </select>
+        </div>
+      </div>
+      <div class="form-group">
+        <label class="form-label">ชื่องาน / สถานที่</label>
+        <input class="form-input" id="mjName" placeholder="เช่น โรงพยาบาลกรุงเทพ">
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-ghost" onclick="closeModal('addMasterJobModal')">ยกเลิก</button>
+      <button class="btn btn-primary" onclick="saveMasterJob()">บันทึก</button>
+    </div>
+  </div>
+</div>
+
+<!-- ADD EMPLOYEE -->
+<div class="modal-overlay" id="addEmployeeModal">
+  <div class="modal">
+    <div class="modal-header">
+      <h2>👤 เพิ่มพนักงาน</h2>
+      <button class="modal-close" onclick="closeModal('addEmployeeModal')">✕</button>
+    </div>
+    <div class="modal-body">
+      <div class="form-row">
+        <div class="form-group">
+          <label class="form-label">ชื่อ (ชื่อเล่น)</label>
+          <input class="form-input" id="empName" placeholder="เช่น วุธ">
+        </div>
+        <div class="form-group">
+          <label class="form-label">ทีม</label>
+          <select class="form-select" id="empTeamSel"></select>
+        </div>
+      </div>
+      <div class="form-group">
+        <label class="form-label">เบอร์โทร</label>
+        <input class="form-input" id="empPhone" placeholder="0xx-xxx-xxxx">
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-ghost" onclick="closeModal('addEmployeeModal')">ยกเลิก</button>
+      <button class="btn btn-primary" onclick="saveEmployee()">บันทึก</button>
+    </div>
+  </div>
+</div>
+
+<!-- ADD VEHICLE -->
+<div class="modal-overlay" id="addVehicleModal">
+  <div class="modal">
+    <div class="modal-header">
+      <h2>🚗 เพิ่มรถยนต์</h2>
+      <button class="modal-close" onclick="closeModal('addVehicleModal')">✕</button>
+    </div>
+    <div class="modal-body">
+      <div class="form-row">
+        <div class="form-group">
+          <label class="form-label">ทะเบียน</label>
+          <input class="form-input" id="vehPlate" placeholder="เช่น กข-1234 กรุงเทพ">
+        </div>
+        <div class="form-group">
+          <label class="form-label">ประเภท</label>
+          <select class="form-select" id="vehType">
+            <option>รถกระบะ</option><option>รถตู้</option>
+            <option>รถมอเตอร์ไซค์</option><option>รถบรรทุก</option><option>รถเก๋ง</option>
+          </select>
+        </div>
+      </div>
+      <div class="form-group">
+        <label class="form-label">ทีมที่ใช้งานประจำ</label>
+        <select class="form-select" id="vehTeam"></select>
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-ghost" onclick="closeModal('addVehicleModal')">ยกเลิก</button>
+      <button class="btn btn-primary" onclick="saveVehicle()">บันทึก</button>
+    </div>
+  </div>
+</div>
+
+<!-- COPY PLAN -->
+<div class="modal-overlay" id="copyPlanModal">
+  <div class="modal">
+    <div class="modal-header">
+      <h2>📋 คัดลอกแผนงาน</h2>
+      <button class="modal-close" onclick="closeModal('copyPlanModal')">✕</button>
+    </div>
+    <div class="modal-body">
+      <p style="color:var(--text2);margin-bottom:16px;font-size:13px">คัดลอกงานทั้งหมดจากเดือนต้นทางไปยังเดือนปลายทาง</p>
+      <div class="form-group">
+        <label class="form-label">คัดลอกจากเดือน</label>
+        <select class="form-select" id="copyFromMonth"></select>
+      </div>
+      <div class="form-group">
+        <label class="form-label">ไปยังเดือน</label>
+        <select class="form-select" id="copyToMonth"></select>
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-ghost" onclick="closeModal('copyPlanModal')">ยกเลิก</button>
+      <button class="btn btn-primary" onclick="executeCopy()">📋 คัดลอก</button>
+    </div>
+  </div>
+</div>
+
+<div id="toast"></div>
+
+<!-- SCRIPT SETTINGS MODAL -->
+<div class="modal-overlay" id="scriptSettingsModal">
+  <div class="modal" style="width:500px">
+    <div class="modal-header">
+      <h2>⚙ ตั้งค่าการเชื่อมต่อ</h2>
+      <button class="modal-close" onclick="closeModal('scriptSettingsModal')">✕</button>
+    </div>
+    <div class="modal-body">
+      <div style="background:rgba(79,142,247,.08);border:1px solid rgba(79,142,247,.2);border-radius:8px;padding:12px 14px;margin-bottom:16px;font-size:12px;color:var(--text2);line-height:1.7">
+        <strong style="color:var(--accent)">Google Apps Script URL</strong> คือ URL ที่ได้จาก Deploy → Web app<br>
+        <strong style="color:var(--accent)">Room ID</strong> คือชื่อห้องข้อมูล — ทีมเดียวกันใช้ค่าเดียวกัน<br>
+        <span style="color:var(--text3)">เปลี่ยน Room ID = สร้างข้อมูลใหม่แยกจากห้องเดิม</span>
+      </div>
+      <div class="form-group">
+        <label class="form-label">Script URL</label>
+        <input class="form-input" id="settingsScriptUrl" placeholder="https://script.google.com/macros/s/.../exec" style="font-size:12px">
+      </div>
+      <div class="form-group">
+        <label class="form-label">Room ID</label>
+        <input class="form-input" id="settingsRoomId" placeholder="เช่น swfe-team-2026" style="font-family:'IBM Plex Mono',monospace">
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-ghost" onclick="closeModal('scriptSettingsModal')">ยกเลิก</button>
+      <button class="btn btn-primary" onclick="saveScriptSettings()">💾 บันทึก &amp; ซิงค์</button>
+    </div>
+  </div>
+</div>
+
+<script>
+// ═══════════════════════════════════════════════════
+// SYNC via Google Apps Script
+// Backend: Google Sheets + Apps Script Web App
+// ทีมใช้ Script URL เดียวกัน + Room ID เดียวกัน
+// ═══════════════════════════════════════════════════
+const STORAGE_KEY   = 'workplan_v3';
+const GAS_URL_KEY   = 'workplan_gas_url';
+const GAS_ROOM_KEY  = 'workplan_gas_room';
+
+let GAS_URL  = localStorage.getItem(GAS_URL_KEY)  || '';
+let GAS_ROOM = localStorage.getItem(GAS_ROOM_KEY) || '';
+let syncTid  = null;
+
+// ── Pull: ดึงข้อมูลจาก Google Sheets ────────────
+async function pullCloud() {
+  if (!GAS_URL || !GAS_ROOM) { setSyncUI('offline'); return; }
+  setSyncUI('saving');
+  try {
+    const url = GAS_URL + '?room=' + encodeURIComponent(GAS_ROOM) + '&t=' + Date.now();
+    const res = await fetch(url);
+    if (!res.ok) { setSyncUI('err'); toast('Script error: ' + res.status, 'err'); return; }
+    const json = await res.json();
+    if (!json.ok) { setSyncUI('err'); toast('API error: ' + json.error, 'err'); return; }
+    if (json.data) {
+      DB = JSON.parse(json.data);
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(DB));
+      setSyncUI('ok');
+      toast('ซิงค์สำเร็จ ✓ (' + (json.updated_at||'').slice(0,10) + ')', 'ok');
+      renderCurrentView();
+    } else {
+      // ห้องใหม่ — push local ขึ้นก่อน
+      await pushCloud(true);
+    }
+  } catch(e) { setSyncUI('err'); toast('ซิงค์ผิดพลาด: ' + e.message, 'err'); }
+}
+
+// ── Push: บันทึกข้อมูลไป Google Sheets ──────────
+async function pushCloud(silent) {
+  if (!GAS_URL || !GAS_ROOM) return;
+  setSyncUI('saving');
+  try {
+    const res = await fetch(GAS_URL, {
+      method: 'POST',
+      headers: { 'Content-Type': 'text/plain' },
+      body: JSON.stringify({ room: GAS_ROOM, data: JSON.stringify(DB) })
+    });
+    if (!res.ok) { setSyncUI('err'); toast('บันทึกผิดพลาด: ' + res.status, 'err'); return; }
+    const json = await res.json();
+    if (!json.ok) { setSyncUI('err'); toast('บันทึก error: ' + json.error, 'err'); return; }
+    setSyncUI('ok');
+    if (!silent) toast('บันทึกแล้ว ✓', 'ok');
+  } catch(e) { setSyncUI('err'); toast('Push ผิดพลาด: ' + e.message, 'err'); }
+}
+
+function scheduleSave() {
+  localStorage.setItem(STORAGE_KEY, JSON.stringify(DB));
+  if (GAS_URL && GAS_ROOM) {
+    clearTimeout(syncTid);
+    syncTid = setTimeout(pushCloud, 1500);
+    setSyncUI('saving');
+  }
+}
+function manualSync() {
+  if (!GAS_URL || !GAS_ROOM) { toast('ยังไม่ได้ตั้งค่า Script URL', 'err'); return; }
+  pullCloud();
+}
+function setSyncUI(state) {
+  const el = document.getElementById('syncStatus');
+  const lb = document.getElementById('syncLabel');
+  if (!el) return;
+  el.className = 'sync-status sync-' + state;
+  lb.textContent = {
+    ok:      'Google Sheets ซิงค์แล้ว ✓',
+    saving:  'กำลังซิงค์...',
+    err:     'ซิงค์ผิดพลาด',
+    offline: GAS_URL ? 'ไม่มี Room ID' : 'ยังไม่ได้เชื่อม'
+  }[state] || state;
+}
+function updateConnLabel() {
+  const el = document.getElementById('syncConnDisplay');
+  if (el) el.textContent = GAS_ROOM ? ('🔗 ' + GAS_ROOM) : 'LOCAL';
+}
+
+// ── Setup ────────────────────────────────────────
+function setupConnect() {
+  const url  = document.getElementById('setupScriptUrl').value.trim();
+  const room = document.getElementById('setupRoomId').value.trim();
+  if (!url)  { alert('กรุณาใส่ Script URL'); return; }
+  if (!room) { alert('กรุณาใส่ Room ID'); return; }
+  GAS_URL  = url;  localStorage.setItem(GAS_URL_KEY,  url);
+  GAS_ROOM = room; localStorage.setItem(GAS_ROOM_KEY, room);
+  launchApp();
+  pullCloud();
+}
+function setupOffline() {
+  GAS_URL = ''; GAS_ROOM = '';
+  launchApp();
+}
+
+// ── Script Settings Modal ────────────────────────
+function openScriptSettings() {
+  document.getElementById('settingsScriptUrl').value = GAS_URL;
+  document.getElementById('settingsRoomId').value    = GAS_ROOM;
+  document.getElementById('scriptSettingsModal').classList.add('open');
+}
+function saveScriptSettings() {
+  const url  = document.getElementById('settingsScriptUrl').value.trim();
+  const room = document.getElementById('settingsRoomId').value.trim();
+  if (url)  { GAS_URL  = url;  localStorage.setItem(GAS_URL_KEY,  url); }
+  if (room) { GAS_ROOM = room; localStorage.setItem(GAS_ROOM_KEY, room); }
+  updateConnLabel();
+  closeModal('scriptSettingsModal');
+  toast('บันทึกแล้ว', 'ok');
+  if (GAS_URL && GAS_ROOM) pullCloud();
+}
+
+// ── launchApp ─────────────────────────────────────
+function launchApp() {
+  document.getElementById('setupScreen').style.display = 'none';
+  document.getElementById('appRoot').style.display = 'block';
+  updateConnLabel();
+  if (!GAS_URL || !GAS_ROOM) setSyncUI('offline');
+  document.getElementById('monthLabel').textContent = thaiMonthLabel(DB.currentMonth);
+  buildTypeFilters(); renderCalendar();
+  document.getElementById('panelAddBtn').onclick = function() { openAddJobModal(panelDate); };
+}
+
+// ─── DATA ─────────────────────────────────────────
+function loadData() {
+  const r = localStorage.getItem(STORAGE_KEY);
+  if (r) try { return JSON.parse(r); } catch {}
+  return defaultData();
+}
+function defaultData() {
+  return {
+    teams: [
+      {id:'7715',name:'ทีม 7715',color:'#4f8ef7'},{id:'3769',name:'ทีม 3769',color:'#34c98a'},
+      {id:'960',name:'ทีม 960',color:'#f5a623'},{id:'3898',name:'ทีม 3898',color:'#9b6ef3'},
+      {id:'2066',name:'ทีม 2066',color:'#f05a5a'},{id:'7630',name:'ทีม 7630',color:'#2ec4b6'},
+      {id:'1820',name:'ทีม 1820',color:'#e67e22'},
+    ],
+    employees: [
+      {id:'e1',name:'วุธ',team:'7715',phone:'',active:true},{id:'e2',name:'ดี',team:'7715',phone:'',active:true},
+      {id:'e3',name:'ปอนด์',team:'3769',phone:'',active:true},{id:'e4',name:'แป๋ง',team:'3769',phone:'',active:true},
+      {id:'e5',name:'เกอร์',team:'3769',phone:'',active:true},{id:'e6',name:'เจม',team:'3769',phone:'',active:true},
+      {id:'e7',name:'ริว',team:'3769',phone:'',active:true},{id:'e8',name:'มิ้น',team:'960',phone:'',active:true},
+      {id:'e9',name:'มิน',team:'960',phone:'',active:true},{id:'e10',name:'เจมส์',team:'960',phone:'',active:true},
+      {id:'e11',name:'วุฒิ',team:'960',phone:'',active:true},{id:'e12',name:'อ้าย',team:'3898',phone:'',active:true},
+      {id:'e13',name:'ต้น',team:'3898',phone:'',active:true},{id:'e14',name:'หมี',team:'3898',phone:'',active:true},
+      {id:'e15',name:'วุฒิชัย',team:'2066',phone:'',active:true},{id:'e16',name:'เจมส์พ',team:'2066',phone:'',active:true},
+      {id:'e17',name:'บี',team:'7630',phone:'',active:true},{id:'e18',name:'มิ้นท์',team:'7630',phone:'',active:true},
+    ],
+    vehicles: [
+      {id:'v1',plate:'กข-0001 กทม.',type:'รถกระบะ',team:'7715',active:true},
+      {id:'v2',plate:'กข-0002 กทม.',type:'รถกระบะ',team:'3769',active:true},
+      {id:'v3',plate:'กข-0003 กทม.',type:'รถตู้',team:'960',active:true},
+      {id:'v4',plate:'มอ-0001 กทม.',type:'รถมอเตอร์ไซค์',team:'1820',active:true},
+    ],
+    masterJobs: [
+      {id:'j1',code:'E69012',name:'รพ.หริภุญชัย',type:'E'},
+      {id:'j2',code:'E69037',name:'เหมืองหิน จ.อุบลราชธานี',type:'E'},
+      {id:'j3',code:'F69005',name:'โรงไฟฟ้าพิจิตร',type:'F'},
+      {id:'j4',code:'M69001',name:'บำรุงรักษาประจำ',type:'M'},
+      {id:'j5',code:'S69009',name:'Block A (ตั้งตู้ใหญ่)',type:'S'},
+      {id:'j6',code:'S69020',name:'PTY (คก+อว)',type:'S'},
+      {id:'j7',code:'S69030',name:'ตั้งตู้บ่อ',type:'S'},
+      {id:'j8',code:'S69031',name:'รพ.กรุงเทพคริสเตียน',type:'S'},
+      {id:'j9',code:'S69033',name:'บุญมิตร (อว.กรีนพ้อย)',type:'S'},
+      {id:'j10',code:'S69047',name:'ฟิล พหล 59',type:'S'},
+      {id:'j11',code:'S69052',name:'KAVALON',type:'S'},
+      {id:'j12',code:'S69059',name:'มอนเต้นีค',type:'S'},
+      {id:'j13',code:'W69006',name:'ลากูน่า บีช 2',type:'W'},
+      {id:'j14',code:'W69017',name:'หอพักรพ.ศิริราช',type:'W'},
+      {id:'j15',code:'W69025',name:'เซียล่า เจริญนคร',type:'W'},
+    ],
+    scheduled: [],
+    currentMonth: '2026-04',
+  };
+}
+
+let DB = loadData();
+let panelDate = null;
+let editingJobId = null;
+let selMasterJobId = null;
+let activeTypeFilter = '';
+let currentView = 'calendar';
+
+// ─── UTILS ────────────────────────────────────────
+function uid() { return Date.now().toString(36) + Math.random().toString(36).slice(2,7); }
+function getTeam(id) { return DB.teams.find(t => t.id === id) || {name:'?', color:'#888'}; }
+function teamColor(id) { return getTeam(id).color; }
+// ✅ FIX: use local date parts to avoid UTC offset shifting the date back 1 day
+function formatDate(d) {
+  return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
+}
+function todayStr() { return formatDate(new Date()); }
+function thaiMonthLabel(ym) {
+  const [y,m] = ym.split('-').map(Number);
+  return ['ม.ค.','ก.พ.','มี.ค.','เม.ย.','พ.ค.','มิ.ย.','ก.ค.','ส.ค.','ก.ย.','ต.ค.','พ.ย.','ธ.ค.'][m-1] + ' ' + (y+543);
+}
+function thaiDate(ds) {
+  // ds = 'YYYY-MM-DD' — parse parts directly to avoid timezone issues
+  const [y,m,d] = ds.split('-').map(Number);
+  const mn = ['ม.ค.','ก.พ.','มี.ค.','เม.ย.','พ.ค.','มิ.ย.','ก.ค.','ส.ค.','ก.ย.','ต.ค.','พ.ย.','ธ.ค.'][m-1];
+  return `${d} ${mn} ${y+543}`;
+}
+function dowOfDate(ds) {
+  // returns 0=Sun..6=Sat without timezone shift
+  const [y,m,d] = ds.split('-').map(Number);
+  return new Date(y, m-1, d).getDay();
+}
+function jobsOnDate(ds) { return DB.scheduled.filter(j => j.dates && j.dates.includes(ds)); }
+function dateRange(start, days) {
+  // start = 'YYYY-MM-DD'
+  const [sy,sm,sd] = start.split('-').map(Number);
+  const out = [];
+  for (let i = 0; i < days; i++) {
+    const d = new Date(sy, sm-1, sd+i); // local date — no UTC shift
+    out.push(formatDate(d));
+  }
+  return out;
+}
+function checkConflicts(emps, vehId, dates, skipId) {
+  const c = [];
+  for (const ds of dates) {
+    const others = DB.scheduled.filter(j => j.id !== skipId && j.dates.includes(ds));
+    for (const eid of emps) {
+      const clash = others.find(j => j.employees.includes(eid));
+      if (clash) c.push(`${DB.employees.find(e=>e.id===eid)?.name||eid} ซ้อน "${clash.jobName}" วันที่ ${thaiDate(ds)}`);
+    }
+    if (vehId) {
+      const vc = others.find(j => j.vehicleId === vehId);
+      if (vc) c.push(`รถ ${DB.vehicles.find(v=>v.id===vehId)?.plate||''} ซ้อน "${vc.jobName}" วันที่ ${thaiDate(ds)}`);
+    }
+  }
+  return [...new Set(c)];
+}
+function toast(msg, type='ok') {
+  const el = document.getElementById('toast');
+  el.textContent = msg; el.className = 'show toast-' + type;
+  setTimeout(() => el.className = '', 2500);
+}
+function typeBadge(t) {
+  const labels = {S:'Site', W:'Water', F:'Factory', E:'EIA', M:'Mining'};
+  return `<span class="job-type-badge type-${t||'S'}">${t||'?'}</span>`;
+}
+const TYPE_FULL = {S:'S — Site', W:'W — Water', F:'F — Factory', E:'E — EIA', M:'M — Mining'};
+
+// ─── NAVIGATION ───────────────────────────────────
+const TITLES = {calendar:'📅 ปฏิทินแผนงาน', employees:'👥 รายพนักงาน', vehicles:'🚗 รายรถ', master:'⚙️ จัดการข้อมูล'};
+function showView(name, el) {
+  document.querySelectorAll('.view').forEach(v => v.classList.remove('active'));
+  document.getElementById('view-' + name).classList.add('active');
+  document.querySelectorAll('.nav-item').forEach(n => n.classList.remove('active'));
+  if (el) el.classList.add('active');
+  document.getElementById('viewTitle').textContent = TITLES[name];
+  currentView = name; closeDayPanel();
+  if (name === 'calendar') renderCalendar();
+  if (name === 'employees') renderEmployees();
+  if (name === 'vehicles') renderVehicles();
+  if (name === 'master') renderMaster();
+}
+function renderCurrentView() {
+  if (currentView === 'calendar') renderCalendar();
+  else if (currentView === 'employees') renderEmployees();
+  else if (currentView === 'vehicles') renderVehicles();
+  else if (currentView === 'master') renderMaster();
+}
+function changeMonth(dir) {
+  const [y,m] = DB.currentMonth.split('-').map(Number);
+  const d = new Date(y, m-1+dir, 1);
+  DB.currentMonth = `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}`;
+  scheduleSave();
+  document.getElementById('monthLabel').textContent = thaiMonthLabel(DB.currentMonth);
+  renderCurrentView();
+}
+
+// ─── CALENDAR ─────────────────────────────────────
+const HOLIDAYS = {
+  '2026-01-01':'วันขึ้นปีใหม่','2026-04-06':'วันจักรี',
+  '2026-04-13':'สงกรานต์','2026-04-14':'สงกรานต์','2026-04-15':'สงกรานต์',
+  '2026-05-01':'วันแรงงาน','2026-05-05':'วันฉัตรมงคล',
+  '2026-12-05':'วันพ่อ','2026-12-10':'วันรัฐธรรมนูญ','2026-12-31':'วันสิ้นปี'
+};
+function renderCalendar() {
+  const [y,m] = DB.currentMonth.split('-').map(Number);
+  document.getElementById('monthLabel').textContent = thaiMonthLabel(DB.currentMonth);
+  const mJobs = DB.scheduled.filter(j => j.dates.some(d => d.startsWith(DB.currentMonth)));
+  const empSet = new Set(mJobs.flatMap(j => j.employees));
+  const daySet = new Set(mJobs.flatMap(j => j.dates.filter(d => d.startsWith(DB.currentMonth))));
+  document.getElementById('statsRow').innerHTML = `
+    <div class="stat-card"><div class="stat-label">งานในเดือนนี้</div><div class="stat-value" style="color:var(--accent)">${mJobs.length}</div><div class="stat-sub">รายการ</div></div>
+    <div class="stat-card"><div class="stat-label">วันที่มีงาน</div><div class="stat-value" style="color:var(--green)">${daySet.size}</div><div class="stat-sub">วัน</div></div>
+    <div class="stat-card"><div class="stat-label">พนักงาน assign</div><div class="stat-value" style="color:var(--amber)">${empSet.size}</div><div class="stat-sub">คน</div></div>
+    <div class="stat-card"><div class="stat-label">งาน E (EIA)</div><div class="stat-value" style="color:var(--red)">${mJobs.filter(j=>j.type==='E').length}</div><div class="stat-sub">รายการ</div></div>
+  `;
+  // Type legend below stats
+  const legendEl = document.getElementById('typeLegend');
+  if (legendEl) legendEl.style.display = 'flex';
+  // Use local date — not UTC — to avoid 1-day offset bug
+  const firstDow = new Date(y, m-1, 1).getDay(); // 0=Sun
+  let startOffset = firstDow === 0 ? 6 : firstDow - 1; // Mon=0
+  const dim = new Date(y, m, 0).getDate();
+  const prevDim = new Date(y, m-1, 0).getDate();
+  const today = todayStr();
+  const cells = [];
+  for (let i=startOffset-1; i>=0; i--) {
+    const pm = m-1 === 0 ? 12 : m-1;
+    const py = m-1 === 0 ? y-1 : y;
+    cells.push({day:prevDim-i, month:pm, year:py, other:true});
+  }
+  for (let d=1; d<=dim; d++) cells.push({day:d, month:m, year:y, other:false});
+  const rem = 42 - cells.length;
+  for (let d=1; d<=rem; d++) {
+    const nm = m+1 > 12 ? 1 : m+1;
+    const ny = m+1 > 12 ? y+1 : y;
+    cells.push({day:d, month:nm, year:ny, other:true});
+  }
+
+  const grid = document.getElementById('calGrid'); grid.innerHTML = '';
+  cells.forEach((cell, idx) => {
+    const ds = `${cell.year}-${String(cell.month).padStart(2,'0')}-${String(cell.day).padStart(2,'0')}`;
+    const cdow = idx % 7; // 0=Mon,6=Sun in our grid
+    const isToday = ds === today;
+    const isHol = !!HOLIDAYS[ds];
+    const isWknd = cdow >= 5;
+    const jobs = jobsOnDate(ds);
+    const div = document.createElement('div');
+    div.className = 'cal-cell' + (cell.other?' other-month':'') + (isToday?' today':'') + (isWknd&&!isHol?' weekend':'') + (isHol?' holiday':'');
+    const dn = isToday ? `<span class="dn">${cell.day}</span>` : `<span>${cell.day}</span>`;
+    const holH = isHol ? `<span class="holiday-label">🎌 ${HOLIDAYS[ds]}</span>` : '';
+    const pills = jobs.slice(0,4).map(j => {
+      const c = teamColor(j.team);
+      return `<div class="cal-job-pill" style="background:${c}1a;color:${c};border-left-color:${c}"
+        onclick="event.stopPropagation();openJobEdit('${j.id}')">${j.jobCode?j.jobCode+' ':''}${j.jobName.slice(0,16)}${j.jobName.length>16?'…':''}</div>`;
+    }).join('');
+    const more = jobs.length>4 ? `<div class="cal-more">+${jobs.length-4} งาน</div>` : '';
+    div.innerHTML = `<div class="cal-day-num">${dn}${holH}</div><div class="cal-jobs">${pills}${more}</div><button class="add-job-inline" title="เพิ่มงานวันที่ ${cell.day}">+</button>`;
+    div.querySelector('.add-job-inline').addEventListener('click', e => { e.stopPropagation(); openAddJobModal(ds); });
+    div.addEventListener('click', () => openDayPanel(ds));
+    grid.appendChild(div);
+  });
+}
+
+// ─── DAY PANEL ────────────────────────────────────
+function openDayPanel(ds) {
+  panelDate = ds;
+  document.getElementById('panelTitle').textContent = thaiDate(ds);
+  const dow = dowOfDate(ds);
+  const dn = ['อาทิตย์','จันทร์','อังคาร','พุธ','พฤหัสบดี','ศุกร์','เสาร์'][dow];
+  document.getElementById('panelSub').textContent = 'วัน' + dn + (HOLIDAYS[ds] ? ' · 🎌 ' + HOLIDAYS[ds] : '');
+  refreshPanel();
+  document.getElementById('dayPanel').classList.add('open');
+}
+function refreshPanel() {
+  if (!panelDate) return;
+  const jobs = jobsOnDate(panelDate);
+  const body = document.getElementById('panelBody');
+  if (!jobs.length) {
+    body.innerHTML = `<div style="text-align:center;padding:40px 0;color:var(--text3)"><div style="font-size:32px;margin-bottom:10px">📭</div><div>ยังไม่มีงานในวันนี้</div></div>`;
+    return;
+  }
+  body.innerHTML = jobs.map(j => {
+    const c = teamColor(j.team);
+    const emps = j.employees.map(eid => DB.employees.find(e=>e.id===eid)?.name||'?').join(', ');
+    const veh = j.vehicleId ? DB.vehicles.find(v=>v.id===j.vehicleId)?.plate||'' : '';
+    return `<div class="day-job-card" style="border-left-color:${c}">
+      <div class="day-job-code">${j.jobCode||''} ${typeBadge(j.type)}</div>
+      <div class="day-job-name">${j.jobName}</div>
+      <div class="day-job-meta">
+        ${emps ? `<span class="meta-chip">👤 ${emps}</span>` : ''}
+        ${veh ? `<span class="meta-chip">🚗 ${veh}</span>` : ''}
+        ${j.note ? `<span class="meta-chip">📝 ${j.note}</span>` : ''}
+      </div>
+      <div style="display:flex;gap:6px;margin-top:8px">
+        <button class="btn btn-ghost btn-sm" onclick="openJobEdit('${j.id}')">✏️ แก้ไข</button>
+        <button class="btn btn-danger btn-sm" onclick="delJob('${j.id}')">🗑 ลบ</button>
+      </div>
+    </div>`;
+  }).join('');
+}
+function closeDayPanel() { document.getElementById('dayPanel').classList.remove('open'); panelDate = null; }
+
+// ─── ADD/EDIT JOB ─────────────────────────────────
+function populateDropdowns() {
+  const tOpts = '<option value="">— เลือกทีม —</option>' + DB.teams.map(t=>`<option value="${t.id}">${t.name}</option>`).join('');
+  ['jobTeam','empTeamSel','vehTeam'].forEach(id => { const el=document.getElementById(id); if(el) el.innerHTML=tOpts; });
+  const ve = document.getElementById('jobVehicle');
+  if (ve) ve.innerHTML = '<option value="">— ไม่ระบุ —</option>' + DB.vehicles.map(v=>`<option value="${v.id}">${v.plate} (${v.type})</option>`).join('');
+}
+
+function openAddJobModal(dateStr) {
+  editingJobId = null; selMasterJobId = null;
+  document.getElementById('addJobTitle').textContent = '➕ เพิ่มงานลงแผน';
+  document.getElementById('jobSearchInput').value = '';
+  document.getElementById('selJobBox').style.display = 'none';
+  document.getElementById('jobStartDate').value = dateStr || formatDate(new Date());
+  document.getElementById('jobDays').value = 1;
+  document.getElementById('jobType').value = '';
+  document.getElementById('jobNote').value = '';
+  document.getElementById('conflictBanner').classList.remove('show');
+  populateDropdowns();
+  document.getElementById('jobTeam').value = '';
+  document.getElementById('jobVehicle').value = '';
+  renderEmpGrid([]);
+  filterJobSearch('');
+  document.getElementById('addJobModal').classList.add('open');
+}
+
+function openJobEdit(id) {
+  const j = DB.scheduled.find(x=>x.id===id); if (!j) return;
+  editingJobId = id; selMasterJobId = j.masterJobId || null;
+  document.getElementById('addJobTitle').textContent = '✏️ แก้ไขงาน';
+  document.getElementById('jobSearchInput').value = '';
+  document.getElementById('selJobBox').style.display = 'block';
+  document.getElementById('selJobCode').textContent = j.jobCode || '';
+  document.getElementById('selJobName').textContent = j.jobName;
+  document.getElementById('selJobTypeDisp').textContent = 'ประเภท ' + (j.type||'-');
+  document.getElementById('jobStartDate').value = j.dates.sort()[0];
+  document.getElementById('jobDays').value = j.dates.length;
+  document.getElementById('jobType').value = j.type || '';
+  document.getElementById('jobNote').value = j.note || '';
+  document.getElementById('conflictBanner').classList.remove('show');
+  populateDropdowns();
+  document.getElementById('jobTeam').value = j.team || '';
+  document.getElementById('jobVehicle').value = j.vehicleId || '';
+  renderEmpGrid(j.employees);
+  filterJobSearch('');
+  document.getElementById('addJobModal').classList.add('open');
+}
+
+function filterJobSearch(q) {
+  const list = document.getElementById('jobSearchList');
+  const all = [...DB.masterJobs].sort((a,b) => (a.code||'').localeCompare(b.code||''));
+  const jobs = q.trim()==='' ? all : all.filter(j => (j.code||'').toLowerCase().includes(q.toLowerCase()) || (j.name||'').toLowerCase().includes(q.toLowerCase()));
+  list.innerHTML = jobs.map(j => `<div class="job-search-item" onclick="selectJob('${j.id}')">
+    <span class="job-code-badge">${j.code||'—'}</span>${typeBadge(j.type)}
+    <span style="flex:1">${j.name}</span>
+  </div>`).join('') || '<div style="padding:10px 14px;color:var(--text3);font-size:13px">ไม่พบ — กรอกเองได้</div>';
+}
+
+function selectJob(id) {
+  const j = DB.masterJobs.find(x=>x.id===id); if (!j) return;
+  selMasterJobId = id;
+  document.getElementById('selJobBox').style.display = 'block';
+  document.getElementById('selJobCode').textContent = j.code || '';
+  document.getElementById('selJobName').textContent = j.name;
+  document.getElementById('selJobTypeDisp').textContent = 'ประเภท ' + (j.type||'-');
+  document.getElementById('jobType').value = j.type || '';
+  document.getElementById('jobSearchList').innerHTML = '';
+  document.getElementById('jobSearchInput').value = '';
+}
+
+function renderEmpGrid(checked) {
+  document.getElementById('empSelectGrid').innerHTML = DB.employees.filter(e=>e.active).map(e =>
+    `<label class="emp-check"><input type="checkbox" value="${e.id}" ${checked.includes(e.id)?'checked':''}>
+    <span class="team-dot" style="background:${teamColor(e.team)}"></span><span>${e.name}</span></label>`
+  ).join('');
+}
+
+function saveJob() {
+  const start = document.getElementById('jobStartDate').value;
+  const days = parseInt(document.getElementById('jobDays').value) || 1;
+  const type = document.getElementById('jobType').value;
+  const team = document.getElementById('jobTeam').value;
+  const vehId = document.getElementById('jobVehicle').value;
+  const note = document.getElementById('jobNote').value.trim();
+  const employees = [...document.querySelectorAll('#empSelectGrid input:checked')].map(i=>i.value);
+  let jobCode='', jobName='';
+  if (selMasterJobId) {
+    const mj = DB.masterJobs.find(j=>j.id===selMasterJobId);
+    jobCode = mj?.code||''; jobName = mj?.name||'';
+  } else {
+    jobCode = document.getElementById('selJobCode').textContent || '';
+    jobName = document.getElementById('selJobName').textContent || '';
+  }
+  if (!start) { toast('กรุณาเลือกวันที่','err'); return; }
+  if (!jobName) { toast('กรุณาเลือกหรือระบุงาน','err'); return; }
+  const dates = dateRange(start, days);
+  const conflicts = checkConflicts(employees, vehId, dates, editingJobId);
+  if (conflicts.length) {
+    document.getElementById('conflictMsg').textContent = conflicts[0] + (conflicts.length>1?` (+${conflicts.length-1} รายการ)`:'');
+    document.getElementById('conflictBanner').classList.add('show');
+  }
+  const rec = {id:editingJobId||uid(), masterJobId:selMasterJobId, jobCode, jobName, type, team, dates, employees, vehicleId:vehId, note};
+  if (editingJobId) {
+    const idx = DB.scheduled.findIndex(j=>j.id===editingJobId);
+    if (idx>=0) DB.scheduled[idx]=rec;
+  } else { DB.scheduled.push(rec); }
+  scheduleSave();
+  closeModal('addJobModal');
+  toast(editingJobId ? 'แก้ไขงานแล้ว ✓' : 'เพิ่มงานแล้ว ✓', 'ok');
+  renderCalendar();
+  if (panelDate) refreshPanel();
+}
+
+function delJob(id) {
+  if (!confirm('ลบงานนี้?')) return;
+  DB.scheduled = DB.scheduled.filter(j=>j.id!==id);
+  scheduleSave(); toast('ลบงานแล้ว','ok');
+  renderCalendar(); if (panelDate) refreshPanel();
+}
+
+// ─── EMPLOYEE VIEW ────────────────────────────────
+// Employee detail popup state
+let empDetailPanel = null;
+
+function renderEmployees() {
+  document.getElementById('empMonthLabel').textContent = thaiMonthLabel(DB.currentMonth);
+  const mJobs = DB.scheduled.filter(j => j.dates.some(d=>d.startsWith(DB.currentMonth)));
+  const allDays = DB.employees.map(emp =>
+    [...new Set(mJobs.filter(j=>j.employees.includes(emp.id)).flatMap(j=>j.dates.filter(d=>d.startsWith(DB.currentMonth))))].length
+  );
+  const maxDays = Math.max(...allDays, 1);
+
+  document.getElementById('empTableBody').innerHTML = DB.employees.filter(e=>e.active).map(emp => {
+    const myJobs = mJobs.filter(j=>j.employees.includes(emp.id));
+    const myDates = [...new Set(myJobs.flatMap(j=>j.dates.filter(d=>d.startsWith(DB.currentMonth))))].sort();
+    const c = teamColor(emp.team);
+    // day chips — each clickable → show jobs that day for this employee
+    const chips = myDates.map(ds => {
+      const dayNum = parseInt(ds.split('-')[2]);
+      return `<span class="day-chip" style="cursor:pointer;border-color:${c}50" onclick="showEmpDayDetail('${emp.id}','${ds}')" title="${thaiDate(ds)}">${dayNum}</span>`;
+    }).join('');
+    const pct = Math.round((myDates.length/maxDays)*100);
+    const teamName = getTeam(emp.team).name;
+    return `<tr id="emprow-${emp.id}">
+      <td>
+        <div style="display:flex;align-items:center;gap:7px;cursor:pointer" onclick="toggleEmpDetail('${emp.id}')">
+          <span class="team-dot" style="background:${c}"></span>
+          <strong style="color:${c}">${emp.name}</strong>
+          <span style="font-size:11px;color:var(--text3)">${teamName}</span>
+          <span style="font-size:11px;color:var(--text3);margin-left:auto">▸</span>
+        </div>
+        <div class="workload-bar"><div class="workload-fill" style="width:${pct}%;background:${c}"></div></div>
+      </td>
+      <td><div class="day-chips">${chips||'<span style="color:var(--text3)">—</span>'}</div></td>
+      <td style="text-align:center;font-weight:700;font-size:18px;color:${c}">${myDates.length}</td>
+    </tr>
+    <tr id="empdetail-${emp.id}" style="display:none">
+      <td colspan="3" style="background:var(--bg3);padding:0">
+        <div id="empdetailbody-${emp.id}" style="padding:10px 16px"></div>
+      </td>
+    </tr>`;
+  }).join('');
+}
+
+function toggleEmpDetail(empId) {
+  const row = document.getElementById('empdetail-'+empId);
+  const isOpen = row.style.display !== 'none';
+  // Close all
+  document.querySelectorAll('[id^="empdetail-"]').forEach(r => r.style.display='none');
+  if (!isOpen) {
+    row.style.display = '';
+    renderEmpDetail(empId, null);
+  }
+}
+
+function showEmpDayDetail(empId, ds) {
+  const row = document.getElementById('empdetail-'+empId);
+  row.style.display = '';
+  renderEmpDetail(empId, ds);
+  // scroll into view
+  row.scrollIntoView({behavior:'smooth', block:'nearest'});
+}
+
+function renderEmpDetail(empId, highlightDs) {
+  const emp = DB.employees.find(e=>e.id===empId); if (!emp) return;
+  const c = teamColor(emp.team);
+  const mJobs = DB.scheduled.filter(j => j.dates.some(d=>d.startsWith(DB.currentMonth)) && j.employees.includes(empId));
+  // Group by date
+  const dateMap = {};
+  mJobs.forEach(j => {
+    j.dates.filter(d=>d.startsWith(DB.currentMonth)).forEach(ds => {
+      if (!dateMap[ds]) dateMap[ds] = [];
+      dateMap[ds].push(j);
+    });
+  });
+  const dates = Object.keys(dateMap).sort();
+  if (!dates.length) {
+    document.getElementById('empdetailbody-'+empId).innerHTML = '<div style="color:var(--text3);padding:6px 0;font-size:13px">ไม่มีงานในเดือนนี้</div>';
+    return;
+  }
+  const html = dates.map(ds => {
+    const dayNum = parseInt(ds.split('-')[2]);
+    const dow = ['อา','จ','อ','พ','พฤ','ศ','ส'][new Date(+ds.split('-')[0], +ds.split('-')[1]-1, dayNum).getDay()];
+    const isHL = ds === highlightDs;
+    const jobs = dateMap[ds].map(j => {
+      const veh = j.vehicleId ? DB.vehicles.find(v=>v.id===j.vehicleId)?.plate||'' : '';
+      return `<div style="margin-left:8px;margin-bottom:3px;font-size:12px">
+        ${typeBadge(j.type)} <strong>${j.jobCode?j.jobCode+' ':''}${j.jobName}</strong>
+        ${veh?`<span style="color:var(--text3);font-size:11px"> 🚗 ${veh}</span>`:''}
+        ${j.note?`<span style="color:var(--text3);font-size:11px"> · ${j.note}</span>`:''}
+      </div>`;
+    }).join('');
+    return `<div style="padding:6px 8px;border-radius:6px;margin-bottom:4px;${isHL?`background:${c}20;border:1px solid ${c}40`:'border:1px solid var(--border)'}">
+      <div style="font-size:12px;font-weight:700;color:${isHL?c:'var(--text2)'};margin-bottom:3px">${dayNum} — วัน${['อาทิตย์','จันทร์','อังคาร','พุธ','พฤหัสบดี','ศุกร์','เสาร์'][new Date(+ds.split('-')[0], +ds.split('-')[1]-1, dayNum).getDay()]} ${thaiDate(ds).split(' ').slice(1).join(' ')}</div>
+      ${jobs}
+    </div>`;
+  }).join('');
+  document.getElementById('empdetailbody-'+empId).innerHTML = `<div style="max-height:320px;overflow-y:auto;padding:4px 0">${html}</div>`;
+}
+
+function filterEmpTable(q) {
+  document.querySelectorAll('#empTableBody tr').forEach(r => {
+    // Hide both the main row and detail row together
+    if (r.id && r.id.startsWith('emprow-')) {
+      const empId = r.id.replace('emprow-','');
+      const hide = !r.textContent.toLowerCase().includes(q.toLowerCase());
+      r.style.display = hide ? 'none' : '';
+      const det = document.getElementById('empdetail-'+empId);
+      if (det) det.style.display = 'none';
+    }
+  });
+}
+
+// ─── VEHICLE VIEW ─────────────────────────────────
+function renderVehicles() {
+  document.getElementById('vehMonthLabel').textContent = thaiMonthLabel(DB.currentMonth);
+  const [y,m] = DB.currentMonth.split('-').map(Number);
+  const dim = new Date(y, m, 0).getDate();
+  const sel = document.getElementById('vehFilter');
+  const cur = sel.value;
+  sel.innerHTML = '<option value="">— ทุกทะเบียน —</option>' + DB.vehicles.map(v=>`<option value="${v.id}">${v.plate}</option>`).join('');
+  sel.value = cur;
+  const filterVehId = sel.value;
+  const vehs = filterVehId ? DB.vehicles.filter(v=>v.id===filterVehId) : DB.vehicles;
+  const wrap = document.getElementById('vehicleListWrap');
+  if (!vehs.length) { wrap.innerHTML='<div style="color:var(--text3);padding:20px">ยังไม่มีข้อมูลรถ</div>'; return; }
+  wrap.innerHTML = vehs.map(v => {
+    const c = teamColor(v.team);
+    const rows = [];
+    for (let day=1; day<=dim; day++) {
+      const ds = `${y}-${String(m).padStart(2,'0')}-${String(day).padStart(2,'0')}`;
+      const jobs = DB.scheduled.filter(j=>j.vehicleId===v.id&&j.dates.includes(ds));
+      if (!jobs.length) continue;
+      const dow = new Date(y, m-1, day).getDay(); // local — no UTC offset
+      const dn = ['อา','จ','อ','พ','พฤ','ศ','ส'][dow];
+      const chips = jobs.map(j=>{
+        const emps = j.employees.map(eid=>DB.employees.find(e=>e.id===eid)?.name||'?').join(', ');
+        const jc = teamColor(j.team);
+        return `<span class="veh-usage-chip" style="border-color:${jc}40">
+          <span class="team-dot" style="background:${jc}"></span>
+          <strong>${j.jobCode?j.jobCode+' ':''}${j.jobName.slice(0,22)}</strong>
+          ${emps?`· <span style="color:var(--text2)">${emps}</span>`:''}
+        </span>`;
+      }).join('');
+      rows.push(`<div class="veh-day-row"><div class="veh-day-label">${day}&nbsp;<span style="font-size:10px;color:var(--text3)">(${dn})</span></div><div class="veh-day-jobs">${chips}</div></div>`);
+    }
+    return `<div style="margin-bottom:16px">
+      <div style="display:flex;align-items:center;gap:10px;margin-bottom:6px">
+        <span style="font-family:'IBM Plex Mono',monospace;font-size:15px;font-weight:700">${v.plate}</span>
+        <span style="font-size:12px;color:var(--text3)">${v.type}</span>
+        <span style="font-size:12px;color:${c}">${getTeam(v.team).name}</span>
+        <span style="font-size:11px;color:var(--text3);margin-left:auto">${rows.length} วันใช้งาน</span>
+      </div>
+      <div class="veh-list-wrap">${rows.join('')||'<div style="padding:12px 16px;color:var(--text3);font-size:13px">ยังไม่มีการใช้งานในเดือนนี้</div>'}</div>
+    </div>`;
+  }).join('');
+}
+
+// ─── MASTER DATA ──────────────────────────────────
+function renderMaster() { renderMasterJobs(); renderMasterEmp(); renderMasterVeh(); }
+function switchMasterTab(tab) {
+  document.querySelectorAll('.master-tab').forEach((t,i)=>t.classList.toggle('active',['jobs','employees','vehicles'][i]===tab));
+  document.querySelectorAll('.master-section').forEach(s=>s.classList.remove('active'));
+  document.getElementById('master-'+tab).classList.add('active');
+}
+function buildTypeFilters() {
+  const types = ['','S','W','F','E','M'];
+  const labels = {'':`ทั้งหมด`, S:'S — Site', W:'W — Water', F:'F — Factory', E:'E — EIA', M:'M — Mining'};
+  const colors = {S:'#4f8ef7', W:'#34c98a', F:'#f5a623', E:'#f05a5a', M:'#9b6ef3', '':'var(--text2)'};
+  const el = document.getElementById('typeFilterBtns');
+  if (!el) return;
+  el.innerHTML = types.map(t =>
+    `<button class="type-filter-btn${t===''?' active-type':''}" data-type="${t}"
+      style="color:${colors[t]};border-color:${colors[t]};${t===''?`background:${colors[t]};color:#fff`:''}"
+      onclick="setTypeFilter('${t}',this)">${labels[t]}</button>`
+  ).join('');
+}
+function setTypeFilter(type, btn) {
+  activeTypeFilter = type;
+  const colors = {S:'#4f8ef7', W:'#34c98a', F:'#f5a623', E:'#f05a5a', M:'#9b6ef3', '':'var(--text2)'};
+  document.querySelectorAll('.type-filter-btn').forEach(b => { b.classList.remove('active-type'); b.style.background='transparent'; b.style.color=colors[b.dataset.type]; });
+  btn.classList.add('active-type'); btn.style.background=colors[type]; btn.style.color='#fff';
+  renderMasterJobs();
+}
+function renderMasterJobs() {
+  const q = (document.getElementById('jobSearchFilter')?.value||'').toLowerCase();
+  let jobs = [...DB.masterJobs];
+  if (activeTypeFilter) jobs = jobs.filter(j=>j.type===activeTypeFilter);
+  if (q) jobs = jobs.filter(j=>(j.code||'').toLowerCase().includes(q)||(j.name||'').toLowerCase().includes(q));
+  jobs.sort((a,b)=>(a.code||'').localeCompare(b.code||''));
+  document.getElementById('masterJobsBody').innerHTML = jobs.map(j => {
+    const isPlanned = DB.scheduled.some(s=>s.masterJobId===j.id&&s.dates.some(d=>d.startsWith(DB.currentMonth)));
+    return `<tr>
+      <td><span class="job-code-badge">${j.code||'—'}</span></td>
+      <td>${j.name}</td>
+      <td>${typeBadge(j.type)}</td>
+      <td><span class="tag ${isPlanned?'tag-planned':'tag-unplanned'}">${isPlanned?'✓ จัดแผนแล้ว':'ยังไม่จัดแผน'}</span></td>
+      <td style="display:flex;gap:5px">
+        <button class="btn btn-ghost btn-sm" onclick="quickPlan('${j.id}')">+ จัดแผน</button>
+        <button class="btn btn-danger btn-sm" onclick="delMasterJob('${j.id}')">ลบ</button>
+      </td>
+    </tr>`;
+  }).join('') || '<tr><td colspan="5" style="color:var(--text3);padding:20px;text-align:center">ไม่พบงาน</td></tr>';
+}
+function quickPlan(jobId) {
+  openAddJobModal(formatDate(new Date()));
+  setTimeout(() => selectJob(jobId), 80);
+}
+function renderMasterEmp() {
+  document.getElementById('masterEmpBody').innerHTML = DB.employees.map(e => {
+    const c = teamColor(e.team);
+    return `<tr>
+      <td style="font-weight:600"><span class="team-dot" style="background:${c}"></span> ${e.name}</td>
+      <td style="color:${c}">${getTeam(e.team).name}</td>
+      <td><span class="tag ${e.active?'tag-active':'tag-inactive'}">${e.active?'ทำงาน':'พัก/ออก'}</span></td>
+      <td style="display:flex;gap:5px">
+        <button class="btn btn-ghost btn-sm" onclick="toggleEmp('${e.id}')">${e.active?'ปิด':'เปิด'}</button>
+        <button class="btn btn-danger btn-sm" onclick="delEmp('${e.id}')">ลบ</button>
+      </td>
+    </tr>`;
+  }).join('');
+}
+function renderMasterVeh() {
+  document.getElementById('masterVehBody').innerHTML = DB.vehicles.map(v => {
+    const c = teamColor(v.team);
+    return `<tr>
+      <td style="font-family:'IBM Plex Mono',monospace;font-weight:600">${v.plate}</td>
+      <td>${v.type}</td>
+      <td style="color:${c}">${getTeam(v.team).name}</td>
+      <td><span class="tag tag-active">พร้อมใช้</span></td>
+      <td><button class="btn btn-danger btn-sm" onclick="delVeh('${v.id}')">ลบ</button></td>
+    </tr>`;
+  }).join('');
+}
+
+// ─── MASTER CRUD ──────────────────────────────────
+function openAddMasterJobModal() {
+  document.getElementById('mjCode').value=''; document.getElementById('mjName').value=''; document.getElementById('mjType').value='S';
+  document.getElementById('addMasterJobModal').classList.add('open');
+}
+function saveMasterJob() {
+  const code=document.getElementById('mjCode').value.trim();
+  const name=document.getElementById('mjName').value.trim();
+  const type=document.getElementById('mjType').value;
+  if(!name){toast('กรุณากรอกชื่องาน','err');return;}
+  DB.masterJobs.push({id:uid(),code,name,type});
+  scheduleSave(); closeModal('addMasterJobModal'); renderMasterJobs(); toast('เพิ่มงานแล้ว ✓','ok');
+}
+function delMasterJob(id) {
+  if(!confirm('ลบงาน?'))return;
+  DB.masterJobs=DB.masterJobs.filter(j=>j.id!==id);
+  scheduleSave(); renderMasterJobs();
+}
+function openAddEmpModal() {
+  document.getElementById('empName').value=''; document.getElementById('empPhone').value='';
+  populateDropdowns();
+  document.getElementById('empTeamSel').value='';
+  document.getElementById('addEmployeeModal').classList.add('open');
+}
+function saveEmployee() {
+  const name=document.getElementById('empName').value.trim();
+  const team=document.getElementById('empTeamSel').value;
+  const phone=document.getElementById('empPhone').value.trim();
+  if(!name){toast('กรุณากรอกชื่อ','err');return;}
+  DB.employees.push({id:uid(),name,team,phone,active:true});
+  scheduleSave(); closeModal('addEmployeeModal'); renderMasterEmp(); toast('เพิ่มพนักงานแล้ว ✓','ok');
+}
+function toggleEmp(id) { const e=DB.employees.find(x=>x.id===id); if(e){e.active=!e.active;scheduleSave();renderMasterEmp();} }
+function delEmp(id) { if(!confirm('ลบพนักงาน?'))return; DB.employees=DB.employees.filter(e=>e.id!==id); scheduleSave();renderMasterEmp(); }
+function openAddVehicleModal() {
+  document.getElementById('vehPlate').value='';
+  populateDropdowns();
+  document.getElementById('vehTeam').value='';
+  document.getElementById('addVehicleModal').classList.add('open');
+}
+function saveVehicle() {
+  const plate=document.getElementById('vehPlate').value.trim();
+  const type=document.getElementById('vehType').value;
+  const team=document.getElementById('vehTeam').value;
+  if(!plate){toast('กรุณากรอกทะเบียน','err');return;}
+  DB.vehicles.push({id:uid(),plate,type,team,active:true});
+  scheduleSave(); closeModal('addVehicleModal'); renderMasterVeh(); toast('เพิ่มรถแล้ว ✓','ok');
+}
+function delVeh(id) { if(!confirm('ลบรถ?'))return; DB.vehicles=DB.vehicles.filter(v=>v.id!==id); scheduleSave();renderMasterVeh(); }
+
+// ─── COPY PLAN ────────────────────────────────────
+function openCopyPlanModal() {
+  const months=[...new Set(DB.scheduled.flatMap(j=>j.dates).map(d=>d.slice(0,7)))].sort();
+  document.getElementById('copyFromMonth').innerHTML = months.map(m=>`<option value="${m}">${thaiMonthLabel(m)}</option>`).join('')||'<option value="">ยังไม่มีแผน</option>';
+  const [y,m] = DB.currentMonth.split('-').map(Number);
+  const nexts=[DB.currentMonth];
+  for(let i=1;i<=6;i++){const d=new Date(y,m-1+i,1);nexts.push(`${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}`);}
+  document.getElementById('copyToMonth').innerHTML = nexts.map(m=>`<option value="${m}">${thaiMonthLabel(m)}</option>`).join('');
+  document.getElementById('copyPlanModal').classList.add('open');
+}
+function executeCopy() {
+  const from=document.getElementById('copyFromMonth').value;
+  const to=document.getElementById('copyToMonth').value;
+  if(!from||!to||from===to){toast('เลือกเดือนให้ต่างกัน','err');return;}
+  const [fy,fm]=from.split('-').map(Number);
+  const [ty,tm]=to.split('-').map(Number);
+  const diff=(ty-fy)*12+(tm-fm);
+  const src=DB.scheduled.filter(j=>j.dates.some(d=>d.startsWith(from)));
+  src.forEach(j=>{
+    const nd=j.dates.map(ds=>{
+      const [dy,dmm,dd]=ds.split('-').map(Number);
+      // Use local date to shift month, avoid UTC offset
+      const shifted=new Date(dy, dmm-1+diff, dd);
+      return formatDate(shifted);
+    });
+    DB.scheduled.push({...j,id:uid(),dates:nd});
+  });
+  scheduleSave(); closeModal('copyPlanModal');
+  toast(`คัดลอก ${src.length} งาน ไป ${thaiMonthLabel(to)} ✓`,'ok');
+  renderCalendar();
+}
+
+// ─── MODAL UTILS ──────────────────────────────────
+function closeModal(id) { document.getElementById(id).classList.remove('open'); }
+document.querySelectorAll('.modal-overlay').forEach(o=>{
+  o.addEventListener('click',e=>{if(e.target===o)o.classList.remove('open');});
+});
+document.addEventListener('keydown',e=>{
+  if(e.key==='Escape'){document.querySelectorAll('.modal-overlay.open').forEach(m=>m.classList.remove('open'));closeDayPanel();}
+});
+
+// ─── BOOT ─────────────────────────────────────────
+if (GAS_URL && GAS_ROOM) {
+  launchApp();
+  pullCloud();
+} else {
+  document.getElementById('setupScreen').style.display = 'flex';
+}
+</script>
+</body>
+</html>
