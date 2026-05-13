@@ -265,6 +265,60 @@ nav{flex:1;padding:8px 0;overflow-y:auto}
   #content{padding:10px 8px 76px;}
 }
 
+
+/* Employee view — responsive split */
+.emp-desktop-only { display: block; }
+.emp-mobile-only  { display: none;  }
+
+/* Employee card (mobile) */
+.emp-card {
+  background: var(--bg2); border: 1px solid var(--border);
+  border-radius: var(--radius); margin-bottom: 10px;
+  overflow: hidden;
+}
+.emp-card-header {
+  display: flex; align-items: center; gap: 10px;
+  padding: 12px 14px; cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+  user-select: none;
+}
+.emp-card-header:active { background: var(--surface); }
+.emp-card-name { font-size: 15px; font-weight: 700; flex: 1; }
+.emp-card-count {
+  font-size: 20px; font-weight: 800; min-width: 32px;
+  text-align: right; line-height: 1;
+}
+.emp-card-days {
+  padding: 0 14px 10px; display: flex; flex-wrap: wrap; gap: 5px;
+}
+.emp-day-btn {
+  min-width: 34px; height: 34px; border-radius: 8px;
+  display: inline-flex; align-items: center; justify-content: center;
+  font-size: 13px; font-weight: 700; cursor: pointer;
+  border: 1.5px solid; transition: all .15s;
+  -webkit-tap-highlight-color: transparent;
+  background: var(--surface);
+}
+.emp-day-btn:active { transform: scale(.9); }
+
+/* Sheet job card */
+.sheet-job-card {
+  background: var(--bg3); border: 1px solid var(--border);
+  border-radius: 8px; padding: 11px 13px; margin-bottom: 8px;
+  border-left: 3px solid;
+}
+.sheet-day-header {
+  font-size: 13px; font-weight: 700; color: var(--text2);
+  padding: 6px 0 4px; margin-top: 4px;
+  border-bottom: 1px solid var(--border); margin-bottom: 8px;
+}
+
+@media (max-width: 640px) {
+  .emp-desktop-only { display: none !important; }
+  .emp-mobile-only  { display: block !important; }
+  #empSearchInput   { width: 100% !important; }
+}
+
 </style>
 </head>
 <body>
@@ -404,17 +458,34 @@ nav{flex:1;padding:8px 0;overflow-y:auto}
     <div class="view" id="view-employees">
       <div class="section-header">
         <div class="section-title">ภาระงานรายพนักงาน — <span id="empMonthLabel"></span></div>
-        <input class="form-input" style="width:200px" placeholder="🔍 ค้นหา..." oninput="filterEmpTable(this.value)">
+        <input class="form-input" style="width:200px" placeholder="🔍 ค้นหา..." id="empSearchInput" oninput="filterEmpTable(this.value)">
       </div>
-      <div class="data-table-wrap">
+      <!-- Desktop: table -->
+      <div class="data-table-wrap emp-desktop-only">
         <table class="emp-table">
           <thead><tr>
-            <th>พนักงาน (คลิกดูรายละเอียด)</th>
-            <th>วันที่มีงาน (คลิกวันดูงาน)</th>
+            <th>พนักงาน (กดดูรายละเอียด)</th>
+            <th>วันที่มีงาน (กดวันดูงาน)</th>
             <th style="text-align:center">วันทำงาน</th>
           </tr></thead>
           <tbody id="empTableBody"></tbody>
         </table>
+      </div>
+      <!-- Mobile: cards -->
+      <div id="empCardList" class="emp-mobile-only"></div>
+    </div>
+
+    <!-- Employee detail bottom sheet (mobile) -->
+    <div class="modal-overlay" id="empDetailOverlay" onclick="if(event.target===this)closeEmpSheet()">
+      <div class="modal" id="empDetailSheet" style="width:100%;border-radius:20px 20px 0 0;max-height:85vh">
+        <div class="modal-header" style="padding:14px 18px 12px">
+          <div>
+            <div id="empSheetName" style="font-size:17px;font-weight:700"></div>
+            <div id="empSheetSub" style="font-size:12px;color:var(--text3);margin-top:2px"></div>
+          </div>
+          <button class="modal-close" onclick="closeEmpSheet()">✕</button>
+        </div>
+        <div id="empSheetBody" style="overflow-y:auto;max-height:calc(85vh - 70px);padding:12px 16px 24px"></div>
       </div>
     </div>
 
@@ -1225,8 +1296,10 @@ function delJob(id) {
 }
 
 // ─── EMPLOYEE VIEW ────────────────────────────────
-// Employee detail popup state
 let empDetailPanel = null;
+
+// Detect mobile
+function isMobileView() { return window.innerWidth <= 640; }
 
 function renderEmployees() {
   document.getElementById('empMonthLabel').textContent = thaiMonthLabel(DB.currentMonth);
@@ -1235,24 +1308,24 @@ function renderEmployees() {
     [...new Set(mJobs.filter(j=>j.employees.includes(emp.id)).flatMap(j=>j.dates.filter(d=>d.startsWith(DB.currentMonth))))].length
   );
   const maxDays = Math.max(...allDays, 1);
+  const activeEmps = DB.employees.filter(e=>e.active);
 
-  document.getElementById('empTableBody').innerHTML = DB.employees.filter(e=>e.active).map(emp => {
+  // ── Desktop: table rows ──────────────────────────
+  document.getElementById('empTableBody').innerHTML = activeEmps.map(emp => {
     const myJobs = mJobs.filter(j=>j.employees.includes(emp.id));
     const myDates = [...new Set(myJobs.flatMap(j=>j.dates.filter(d=>d.startsWith(DB.currentMonth))))].sort();
     const c = teamColor(emp.team);
-    // day chips — each clickable → show jobs that day for this employee
     const chips = myDates.map(ds => {
       const dayNum = parseInt(ds.split('-')[2]);
       return `<span class="day-chip" style="cursor:pointer;border-color:${c}50" onclick="showEmpDayDetail('${emp.id}','${ds}')" title="${thaiDate(ds)}">${dayNum}</span>`;
     }).join('');
     const pct = Math.round((myDates.length/maxDays)*100);
-    const teamName = getTeam(emp.team).name;
     return `<tr id="emprow-${emp.id}">
       <td>
         <div style="display:flex;align-items:center;gap:7px;cursor:pointer" onclick="toggleEmpDetail('${emp.id}')">
           <span class="team-dot" style="background:${c}"></span>
           <strong style="color:${c}">${emp.name}</strong>
-          <span style="font-size:11px;color:var(--text3)">${teamName}</span>
+          <span style="font-size:11px;color:var(--text3)">${getTeam(emp.team).name}</span>
           <span style="font-size:11px;color:var(--text3);margin-left:auto">▸</span>
         </div>
         <div class="workload-bar"><div class="workload-fill" style="width:${pct}%;background:${c}"></div></div>
@@ -1266,74 +1339,169 @@ function renderEmployees() {
       </td>
     </tr>`;
   }).join('');
+
+  // ── Mobile: card list ────────────────────────────
+  document.getElementById('empCardList').innerHTML = activeEmps.map(emp => {
+    const myJobs = mJobs.filter(j=>j.employees.includes(emp.id));
+    const myDates = [...new Set(myJobs.flatMap(j=>j.dates.filter(d=>d.startsWith(DB.currentMonth))))].sort();
+    const c = teamColor(emp.team);
+    const pct = Math.round((myDates.length/maxDays)*100);
+    const dayBtns = myDates.map(ds => {
+      const dayNum = parseInt(ds.split('-')[2]);
+      const [dy,dm,dd2] = ds.split('-').map(Number);
+      const isWknd = new Date(dy,dm-1,dd2).getDay() === 0 || new Date(dy,dm-1,dd2).getDay() === 6;
+      return `<button class="emp-day-btn"
+        style="color:${c};border-color:${c}60;background:${c}15"
+        onclick="openEmpSheet('${emp.id}','${ds}')">${dayNum}</button>`;
+    }).join('');
+    return `<div class="emp-card" id="empcard-${emp.id}">
+      <div class="emp-card-header" onclick="openEmpSheet('${emp.id}',null)">
+        <span class="team-dot" style="background:${c};width:10px;height:10px"></span>
+        <span class="emp-card-name" style="color:${c}">${emp.name}</span>
+        <div>
+          <div class="workload-bar" style="width:60px;margin-bottom:2px"><div class="workload-fill" style="width:${pct}%;background:${c}"></div></div>
+          <div style="font-size:10px;color:var(--text3);text-align:right">${getTeam(emp.team).name}</div>
+        </div>
+        <span class="emp-card-count" style="color:${c}">${myDates.length}</span>
+      </div>
+      ${myDates.length ? `<div class="emp-card-days">${dayBtns}</div>` : ''}
+    </div>`;
+  }).join('');
 }
 
+// ── Desktop detail (expand row) ───────────────────
 function toggleEmpDetail(empId) {
   const row = document.getElementById('empdetail-'+empId);
   const isOpen = row.style.display !== 'none';
-  // Close all
   document.querySelectorAll('[id^="empdetail-"]').forEach(r => r.style.display='none');
-  if (!isOpen) {
-    row.style.display = '';
-    renderEmpDetail(empId, null);
-  }
+  if (!isOpen) { row.style.display=''; renderEmpDetailInline(empId, null); }
 }
-
 function showEmpDayDetail(empId, ds) {
   const row = document.getElementById('empdetail-'+empId);
   row.style.display = '';
-  renderEmpDetail(empId, ds);
-  // scroll into view
-  row.scrollIntoView({behavior:'smooth', block:'nearest'});
+  renderEmpDetailInline(empId, ds);
+  setTimeout(()=>row.scrollIntoView({behavior:'smooth',block:'nearest'}),50);
 }
-
-function renderEmpDetail(empId, highlightDs) {
-  const emp = DB.employees.find(e=>e.id===empId); if (!emp) return;
+function renderEmpDetailInline(empId, highlightDs) {
+  const emp = DB.employees.find(e=>e.id===empId); if(!emp) return;
   const c = teamColor(emp.team);
-  const mJobs = DB.scheduled.filter(j => j.dates.some(d=>d.startsWith(DB.currentMonth)) && j.employees.includes(empId));
-  // Group by date
-  const dateMap = {};
-  mJobs.forEach(j => {
-    j.dates.filter(d=>d.startsWith(DB.currentMonth)).forEach(ds => {
-      if (!dateMap[ds]) dateMap[ds] = [];
-      dateMap[ds].push(j);
-    });
-  });
+  const dateMap = buildEmpDateMap(empId);
   const dates = Object.keys(dateMap).sort();
   if (!dates.length) {
-    document.getElementById('empdetailbody-'+empId).innerHTML = '<div style="color:var(--text3);padding:6px 0;font-size:13px">ไม่มีงานในเดือนนี้</div>';
+    document.getElementById('empdetailbody-'+empId).innerHTML='<div style="color:var(--text3);padding:6px 0;font-size:13px">ไม่มีงานในเดือนนี้</div>';
     return;
   }
-  const html = dates.map(ds => {
-    const dayNum = parseInt(ds.split('-')[2]);
-    const dow = ['อา','จ','อ','พ','พฤ','ศ','ส'][new Date(+ds.split('-')[0], +ds.split('-')[1]-1, dayNum).getDay()];
+  const inner = dates.map(ds => {
     const isHL = ds === highlightDs;
-    const jobs = dateMap[ds].map(j => {
-      const veh = j.vehicleId ? DB.vehicles.find(v=>v.id===j.vehicleId)?.plate||'' : '';
-      return `<div style="margin-left:8px;margin-bottom:3px;font-size:12px">
-        ${typeBadge(j.type)} <strong>${j.jobCode?j.jobCode+' ':''}${j.jobName}</strong>
-        ${veh?`<span style="color:var(--text3);font-size:11px"> 🚗 ${veh}</span>`:''}
-        ${j.note?`<span style="color:var(--text3);font-size:11px"> · ${j.note}</span>`:''}
-      </div>`;
-    }).join('');
     return `<div style="padding:6px 8px;border-radius:6px;margin-bottom:4px;${isHL?`background:${c}20;border:1px solid ${c}40`:'border:1px solid var(--border)'}">
-      <div style="font-size:12px;font-weight:700;color:${isHL?c:'var(--text2)'};margin-bottom:3px">${dayNum} — วัน${['อาทิตย์','จันทร์','อังคาร','พุธ','พฤหัสบดี','ศุกร์','เสาร์'][new Date(+ds.split('-')[0], +ds.split('-')[1]-1, dayNum).getDay()]} ${thaiDate(ds).split(' ').slice(1).join(' ')}</div>
-      ${jobs}
+      <div style="font-size:12px;font-weight:700;color:${isHL?c:'var(--text2)'};margin-bottom:3px">${buildDayLabel(ds)}</div>
+      ${buildJobLines(dateMap[ds])}
     </div>`;
   }).join('');
-  document.getElementById('empdetailbody-'+empId).innerHTML = `<div style="max-height:320px;overflow-y:auto;padding:4px 0">${html}</div>`;
+  document.getElementById('empdetailbody-'+empId).innerHTML=`<div style="max-height:320px;overflow-y:auto;padding:4px 0">${inner}</div>`;
+}
+
+// ── Mobile bottom sheet ───────────────────────────
+function openEmpSheet(empId, highlightDs) {
+  const emp = DB.employees.find(e=>e.id===empId); if(!emp) return;
+  const c = teamColor(emp.team);
+  const dateMap = buildEmpDateMap(empId);
+  const dates = Object.keys(dateMap).sort();
+
+  document.getElementById('empSheetName').textContent = emp.name;
+  document.getElementById('empSheetName').style.color = c;
+  document.getElementById('empSheetSub').textContent =
+    getTeam(emp.team).name + ' · ' + dates.length + ' วัน · ' +
+    Object.values(dateMap).flat().length + ' งาน';
+
+  if (!dates.length) {
+    document.getElementById('empSheetBody').innerHTML =
+      '<div style="text-align:center;padding:40px 0;color:var(--text3)"><div style="font-size:32px;margin-bottom:10px">📭</div><div>ไม่มีงานในเดือนนี้</div></div>';
+  } else {
+    document.getElementById('empSheetBody').innerHTML = dates.map(ds => {
+      const isHL = ds === highlightDs;
+      const jobs = dateMap[ds];
+      return `<div style="margin-bottom:14px">
+        <div class="sheet-day-header" style="${isHL?`color:${c};border-color:${c}50`:''}">
+          ${isHL?'📍 ':''} ${buildDayLabel(ds)}
+        </div>
+        ${jobs.map(j => {
+          const jc = teamColor(j.team);
+          const emps = j.employees.map(eid=>DB.employees.find(e=>e.id===eid)?.name||'?').join(', ');
+          const veh = j.vehicleId ? DB.vehicles.find(v=>v.id===j.vehicleId)?.plate||'' : '';
+          return `<div class="sheet-job-card" style="border-left-color:${jc}">
+            <div style="display:flex;align-items:center;gap:6px;margin-bottom:4px">
+              ${typeBadge(j.type)}
+              <span style="font-family:'IBM Plex Mono',monospace;font-size:11px;color:var(--text3)">${j.jobCode||''}</span>
+            </div>
+            <div style="font-size:14px;font-weight:700;margin-bottom:5px">${j.jobName}</div>
+            <div style="display:flex;flex-wrap:wrap;gap:5px">
+              ${emps?`<span class="meta-chip">👤 ${emps}</span>`:''}
+              ${veh?`<span class="meta-chip">🚗 ${veh}</span>`:''}
+              ${j.note?`<span class="meta-chip">📝 ${j.note}</span>`:''}
+            </div>
+          </div>`;
+        }).join('')}
+      </div>`;
+    }).join('');
+  }
+
+  document.getElementById('empDetailOverlay').classList.add('open');
+  // Scroll to highlighted date
+  if (highlightDs) {
+    setTimeout(()=>{
+      const el = document.getElementById('empSheetBody');
+      if (el) el.scrollTop = 0; // will scroll to first highlighted naturally via order
+    }, 100);
+  }
+}
+function closeEmpSheet() {
+  document.getElementById('empDetailOverlay').classList.remove('open');
+}
+
+// ── Shared helpers ────────────────────────────────
+function buildEmpDateMap(empId) {
+  const mJobs = DB.scheduled.filter(j=>j.dates.some(d=>d.startsWith(DB.currentMonth))&&j.employees.includes(empId));
+  const map = {};
+  mJobs.forEach(j=>{
+    j.dates.filter(d=>d.startsWith(DB.currentMonth)).forEach(ds=>{
+      if(!map[ds]) map[ds]=[];
+      map[ds].push(j);
+    });
+  });
+  return map;
+}
+function buildDayLabel(ds) {
+  const [y,m,d] = ds.split('-').map(Number);
+  const dow = ['อาทิตย์','จันทร์','อังคาร','พุธ','พฤหัสบดี','ศุกร์','เสาร์'][new Date(y,m-1,d).getDay()];
+  return `${d} — วัน${dow} ${thaiDate(ds).split(' ').slice(1).join(' ')}`;
+}
+function buildJobLines(jobs) {
+  return jobs.map(j=>{
+    const veh = j.vehicleId?DB.vehicles.find(v=>v.id===j.vehicleId)?.plate||'':'';
+    return `<div style="margin-left:6px;margin-bottom:3px;font-size:12px">
+      ${typeBadge(j.type)} <strong>${j.jobCode?j.jobCode+' ':''}${j.jobName}</strong>
+      ${veh?`<span style="color:var(--text3);font-size:11px"> 🚗 ${veh}</span>`:''}
+      ${j.note?`<span style="color:var(--text3);font-size:11px"> · ${j.note}</span>`:''}
+    </div>`;
+  }).join('');
 }
 
 function filterEmpTable(q) {
+  const ql = q.toLowerCase();
+  // Desktop
   document.querySelectorAll('#empTableBody tr').forEach(r => {
-    // Hide both the main row and detail row together
     if (r.id && r.id.startsWith('emprow-')) {
       const empId = r.id.replace('emprow-','');
-      const hide = !r.textContent.toLowerCase().includes(q.toLowerCase());
-      r.style.display = hide ? 'none' : '';
+      const hide = !r.textContent.toLowerCase().includes(ql);
+      r.style.display = hide?'none':'';
       const det = document.getElementById('empdetail-'+empId);
-      if (det) det.style.display = 'none';
+      if (det) det.style.display='none';
     }
+  });
+  // Mobile
+  document.querySelectorAll('#empCardList .emp-card').forEach(card => {
+    card.style.display = card.textContent.toLowerCase().includes(ql) ? '' : 'none';
   });
 }
 
