@@ -145,6 +145,7 @@ nav{flex:1;padding:8px 0;overflow-y:auto}
 .type-F{background:rgba(245,166,35,.2);color:#f8c060}
 .type-E{background:rgba(240,90,90,.2);color:#ff8a8a}
 .type-M{background:rgba(155,110,243,.2);color:#c4a2ff}
+.type-D{background:rgba(46,196,182,.2);color:#2ec4b6}
 .conflict-banner{background:rgba(240,90,90,.1);border:1px solid rgba(240,90,90,.3);border-radius:var(--radius-sm);padding:8px 12px;font-size:12px;color:var(--red);margin-bottom:12px;display:none}
 .conflict-banner.show{display:block}
 .sel-job-box{background:var(--bg3);border:1px solid var(--border);border-radius:var(--radius-sm);padding:9px 12px;margin-bottom:12px;display:none}
@@ -444,6 +445,7 @@ nav{flex:1;padding:8px 0;overflow-y:auto}
         <span><span class="job-type-badge type-F">F</span> Factory (โรงงาน)</span>
         <span><span class="job-type-badge type-E">E</span> EIA</span>
         <span><span class="job-type-badge type-M">M</span> Mining (เหมือง)</span>
+        <span><span class="job-type-badge type-D">D</span> รายวัน</span>
       </div>
       <div class="cal-header">
         <div class="cal-dow">จันทร์</div><div class="cal-dow">อังคาร</div>
@@ -607,6 +609,7 @@ nav{flex:1;padding:8px 0;overflow-y:auto}
             <option value="F">F — Factory (โรงงาน)</option>
             <option value="E">E — EIA</option>
             <option value="M">M — Mining (เหมือง)</option>
+            <option value="D">D — รายวัน (Daily)</option>
           </select>
         </div>
         <div class="form-group">
@@ -638,7 +641,7 @@ nav{flex:1;padding:8px 0;overflow-y:auto}
 <div class="modal-overlay" id="addMasterJobModal">
   <div class="modal">
     <div class="modal-header">
-      <h2>📦 เพิ่มรายการงานใหม่</h2>
+      <h2 id="addMasterJobModalTitle">📦 เพิ่มรายการงานใหม่</h2>
       <button class="modal-close" onclick="closeModal('addMasterJobModal')">✕</button>
     </div>
     <div class="modal-body">
@@ -655,6 +658,7 @@ nav{flex:1;padding:8px 0;overflow-y:auto}
             <option value="F">F — Factory</option>
             <option value="E">E — EIA</option>
             <option value="M">M — Mining</option>
+            <option value="D">D — รายวัน</option>
           </select>
         </div>
       </div>
@@ -674,7 +678,7 @@ nav{flex:1;padding:8px 0;overflow-y:auto}
 <div class="modal-overlay" id="addEmployeeModal">
   <div class="modal">
     <div class="modal-header">
-      <h2>👤 เพิ่มพนักงาน</h2>
+      <h2 id="addEmpModalTitle">👤 เพิ่มพนักงาน</h2>
       <button class="modal-close" onclick="closeModal('addEmployeeModal')">✕</button>
     </div>
     <div class="modal-body">
@@ -704,7 +708,7 @@ nav{flex:1;padding:8px 0;overflow-y:auto}
 <div class="modal-overlay" id="addVehicleModal">
   <div class="modal">
     <div class="modal-header">
-      <h2>🚗 เพิ่มรถยนต์</h2>
+      <h2 id="addVehModalTitle">🚗 เพิ่มรถยนต์</h2>
       <button class="modal-close" onclick="closeModal('addVehicleModal')">✕</button>
     </div>
     <div class="modal-body">
@@ -965,6 +969,7 @@ function defaultData() {
       {id:'j13',code:'W69006',name:'ลากูน่า บีช 2',type:'W'},
       {id:'j14',code:'W69017',name:'หอพักรพ.ศิริราช',type:'W'},
       {id:'j15',code:'W69025',name:'เซียล่า เจริญนคร',type:'W'},
+      {id:'j16',code:'D69001',name:'งานประจำวัน / Daily Check',type:'D'},
     ],
     scheduled: [],
     currentMonth: '2026-04',
@@ -1558,9 +1563,9 @@ function switchMasterTab(tab) {
   document.getElementById('master-'+tab).classList.add('active');
 }
 function buildTypeFilters() {
-  const types = ['','S','W','F','E','M'];
-  const labels = {'':`ทั้งหมด`, S:'S — Site', W:'W — Water', F:'F — Factory', E:'E — EIA', M:'M — Mining'};
-  const colors = {S:'#4f8ef7', W:'#34c98a', F:'#f5a623', E:'#f05a5a', M:'#9b6ef3', '':'var(--text2)'};
+  const types = ['','S','W','F','E','M','D'];
+  const labels = {'':`ทั้งหมด`, S:'S — Site', W:'W — Water', F:'F — Factory', E:'E — EIA', M:'M — Mining', D:'D — รายวัน'};
+  const colors = {S:'#4f8ef7', W:'#34c98a', F:'#f5a623', E:'#f05a5a', M:'#9b6ef3', D:'#2ec4b6', '':'var(--text2)'};
   const el = document.getElementById('typeFilterBtns');
   if (!el) return;
   el.innerHTML = types.map(t =>
@@ -1571,7 +1576,7 @@ function buildTypeFilters() {
 }
 function setTypeFilter(type, btn) {
   activeTypeFilter = type;
-  const colors = {S:'#4f8ef7', W:'#34c98a', F:'#f5a623', E:'#f05a5a', M:'#9b6ef3', '':'var(--text2)'};
+  const colors = {S:'#4f8ef7', W:'#34c98a', F:'#f5a623', E:'#f05a5a', M:'#9b6ef3', D:'#2ec4b6', '':'var(--text2)'};
   document.querySelectorAll('.type-filter-btn').forEach(b => { b.classList.remove('active-type'); b.style.background='transparent'; b.style.color=colors[b.dataset.type]; });
   btn.classList.add('active-type'); btn.style.background=colors[type]; btn.style.color='#fff';
   renderMasterJobs();
@@ -1583,15 +1588,29 @@ function renderMasterJobs() {
   if (q) jobs = jobs.filter(j=>(j.code||'').toLowerCase().includes(q)||(j.name||'').toLowerCase().includes(q));
   jobs.sort((a,b)=>(a.code||'').localeCompare(b.code||''));
   document.getElementById('masterJobsBody').innerHTML = jobs.map(j => {
-    const isPlanned = DB.scheduled.some(s=>s.masterJobId===j.id&&s.dates.some(d=>d.startsWith(DB.currentMonth)));
+    // หาวันที่จัดแผนทั้งหมดของงานนี้ในเดือนปัจจุบัน
+    const planned = DB.scheduled.filter(s=>s.masterJobId===j.id&&s.dates.some(d=>d.startsWith(DB.currentMonth)));
+    const plannedDates = [...new Set(planned.flatMap(s=>s.dates.filter(d=>d.startsWith(DB.currentMonth))))].sort();
+    const isPlanned = plannedDates.length > 0;
+    const datePills = plannedDates.map(d=>{
+      const day = parseInt(d.split('-')[2]);
+      const [dy,dm,dd2] = d.split('-').map(Number);
+      const dow = ['อา','จ','อ','พ','พฤ','ศ','ส'][new Date(dy,dm-1,dd2).getDay()];
+      return `<span style="background:rgba(79,142,247,.15);color:var(--accent);border-radius:4px;padding:1px 6px;font-size:11px;white-space:nowrap">${day}(${dow})</span>`;
+    }).join(' ');
     return `<tr>
       <td><span class="job-code-badge">${j.code||'—'}</span></td>
-      <td>${j.name}</td>
+      <td><div style="font-weight:600">${j.name}</div>
+        ${isPlanned?`<div style="display:flex;flex-wrap:wrap;gap:3px;margin-top:4px">${datePills}</div>`:''}
+      </td>
       <td>${typeBadge(j.type)}</td>
       <td><span class="tag ${isPlanned?'tag-planned':'tag-unplanned'}">${isPlanned?'✓ จัดแผนแล้ว':'ยังไม่จัดแผน'}</span></td>
-      <td style="display:flex;gap:5px">
-        <button class="btn btn-ghost btn-sm" onclick="quickPlan('${j.id}')">+ จัดแผน</button>
-        <button class="btn btn-danger btn-sm" onclick="delMasterJob('${j.id}')">ลบ</button>
+      <td>
+        <div style="display:flex;gap:4px;flex-wrap:wrap">
+          <button class="btn btn-ghost btn-sm" onclick="openEditMasterJob('${j.id}')">✏️</button>
+          <button class="btn btn-ghost btn-sm" onclick="quickPlan('${j.id}')">+ แผน</button>
+          <button class="btn btn-danger btn-sm" onclick="delMasterJob('${j.id}')">ลบ</button>
+        </div>
       </td>
     </tr>`;
   }).join('') || '<tr><td colspan="5" style="color:var(--text3);padding:20px;text-align:center">ไม่พบงาน</td></tr>';
@@ -1604,12 +1623,17 @@ function renderMasterEmp() {
   document.getElementById('masterEmpBody').innerHTML = DB.employees.map(e => {
     const c = teamColor(e.team);
     return `<tr>
-      <td style="font-weight:600"><span class="team-dot" style="background:${c}"></span> ${e.name}</td>
+      <td style="font-weight:600"><span class="team-dot" style="background:${c}"></span> ${e.name}
+        ${e.phone?`<div style="font-size:11px;color:var(--text3);font-weight:400">${e.phone}</div>`:''}
+      </td>
       <td style="color:${c}">${getTeam(e.team).name}</td>
       <td><span class="tag ${e.active?'tag-active':'tag-inactive'}">${e.active?'ทำงาน':'พัก/ออก'}</span></td>
-      <td style="display:flex;gap:5px">
-        <button class="btn btn-ghost btn-sm" onclick="toggleEmp('${e.id}')">${e.active?'ปิด':'เปิด'}</button>
-        <button class="btn btn-danger btn-sm" onclick="delEmp('${e.id}')">ลบ</button>
+      <td>
+        <div style="display:flex;gap:4px;flex-wrap:wrap">
+          <button class="btn btn-ghost btn-sm" onclick="openEditEmp('${e.id}')">✏️</button>
+          <button class="btn btn-ghost btn-sm" onclick="toggleEmp('${e.id}')">${e.active?'ปิด':'เปิด'}</button>
+          <button class="btn btn-danger btn-sm" onclick="delEmp('${e.id}')">ลบ</button>
+        </div>
       </td>
     </tr>`;
   }).join('');
@@ -1617,65 +1641,147 @@ function renderMasterEmp() {
 function renderMasterVeh() {
   document.getElementById('masterVehBody').innerHTML = DB.vehicles.map(v => {
     const c = teamColor(v.team);
+    // นับวันใช้งานเดือนนี้
+    const usedDays = [...new Set(
+      DB.scheduled.filter(j=>j.vehicleId===v.id&&j.dates.some(d=>d.startsWith(DB.currentMonth)))
+        .flatMap(j=>j.dates.filter(d=>d.startsWith(DB.currentMonth)))
+    )].length;
     return `<tr>
       <td style="font-family:'IBM Plex Mono',monospace;font-weight:600">${v.plate}</td>
       <td>${v.type}</td>
       <td style="color:${c}">${getTeam(v.team).name}</td>
-      <td><span class="tag tag-active">พร้อมใช้</span></td>
-      <td><button class="btn btn-danger btn-sm" onclick="delVeh('${v.id}')">ลบ</button></td>
+      <td>
+        <span class="tag tag-active">พร้อมใช้</span>
+        ${usedDays?`<span style="font-size:11px;color:var(--text3);margin-left:4px">${usedDays} วันเดือนนี้</span>`:''}
+      </td>
+      <td>
+        <div style="display:flex;gap:4px">
+          <button class="btn btn-ghost btn-sm" onclick="openEditVeh('${v.id}')">✏️</button>
+          <button class="btn btn-danger btn-sm" onclick="delVeh('${v.id}')">ลบ</button>
+        </div>
+      </td>
     </tr>`;
   }).join('');
 }
 
 // ─── MASTER CRUD ──────────────────────────────────
+function toggleEmp(id) { const e=DB.employees.find(x=>x.id===id); if(e){e.active=!e.active;scheduleSave();renderMasterEmp();} }
+function delEmp(id) { if(!confirm('ลบพนักงาน?'))return; DB.employees=DB.employees.filter(e=>e.id!==id); scheduleSave();renderMasterEmp(); }
+function delMasterJob(id) {
+  if(!confirm('ลบงานนี้? งานที่จัดแผนไว้จะยังคงอยู่'))return;
+  DB.masterJobs=DB.masterJobs.filter(j=>j.id!==id);
+  scheduleSave(); renderMasterJobs();
+}
+function delVeh(id) { if(!confirm('ลบรถ?'))return; DB.vehicles=DB.vehicles.filter(v=>v.id!==id); scheduleSave();renderMasterVeh(); }
+
+// ─── EDIT MASTER DATA ─────────────────────────────
+
+// ── Edit Job ──────────────────────────────────────
+function openEditMasterJob(id) {
+  const j = DB.masterJobs.find(x=>x.id===id); if(!j) return;
+  document.getElementById('mjCode').value = j.code||'';
+  document.getElementById('mjName').value = j.name||'';
+  document.getElementById('mjType').value = j.type||'S';
+  document.getElementById('addMasterJobModal').dataset.editId = id;
+  document.getElementById('addMasterJobModalTitle').textContent = '✏️ แก้ไขรายการงาน';
+  document.getElementById('addMasterJobModal').classList.add('open');
+}
 function openAddMasterJobModal() {
-  document.getElementById('mjCode').value=''; document.getElementById('mjName').value=''; document.getElementById('mjType').value='S';
+  document.getElementById('mjCode').value='';
+  document.getElementById('mjName').value='';
+  document.getElementById('mjType').value='S';
+  delete document.getElementById('addMasterJobModal').dataset.editId;
+  document.getElementById('addMasterJobModalTitle').textContent = '📦 เพิ่มรายการงานใหม่';
   document.getElementById('addMasterJobModal').classList.add('open');
 }
 function saveMasterJob() {
-  const code=document.getElementById('mjCode').value.trim();
-  const name=document.getElementById('mjName').value.trim();
-  const type=document.getElementById('mjType').value;
+  const code = document.getElementById('mjCode').value.trim();
+  const name = document.getElementById('mjName').value.trim();
+  const type = document.getElementById('mjType').value;
   if(!name){toast('กรุณากรอกชื่องาน','err');return;}
-  DB.masterJobs.push({id:uid(),code,name,type});
-  scheduleSave(); closeModal('addMasterJobModal'); renderMasterJobs(); toast('เพิ่มงานแล้ว ✓','ok');
+  const editId = document.getElementById('addMasterJobModal').dataset.editId;
+  if (editId) {
+    const j = DB.masterJobs.find(x=>x.id===editId);
+    if (j) { j.code=code; j.name=name; j.type=type; }
+    // อัพเดท scheduled ที่ใช้งานนี้ด้วย
+    DB.scheduled.filter(s=>s.masterJobId===editId).forEach(s=>{s.jobCode=code;s.jobName=name;s.type=type;});
+  } else {
+    DB.masterJobs.push({id:uid(),code,name,type});
+  }
+  scheduleSave(); closeModal('addMasterJobModal'); renderMasterJobs();
+  toast(editId?'แก้ไขงานแล้ว ✓':'เพิ่มงานแล้ว ✓','ok');
 }
-function delMasterJob(id) {
-  if(!confirm('ลบงาน?'))return;
-  DB.masterJobs=DB.masterJobs.filter(j=>j.id!==id);
-  scheduleSave(); renderMasterJobs();
+
+// ── Edit Employee ──────────────────────────────────
+function openEditEmp(id) {
+  const e = DB.employees.find(x=>x.id===id); if(!e) return;
+  document.getElementById('empName').value  = e.name||'';
+  document.getElementById('empPhone').value = e.phone||'';
+  populateDropdowns();
+  document.getElementById('empTeamSel').value = e.team||'';
+  document.getElementById('addEmployeeModal').dataset.editId = id;
+  document.getElementById('addEmpModalTitle').textContent = '✏️ แก้ไขข้อมูลพนักงาน';
+  document.getElementById('addEmployeeModal').classList.add('open');
 }
 function openAddEmpModal() {
   document.getElementById('empName').value=''; document.getElementById('empPhone').value='';
   populateDropdowns();
   document.getElementById('empTeamSel').value='';
+  delete document.getElementById('addEmployeeModal').dataset.editId;
+  document.getElementById('addEmpModalTitle').textContent = '👤 เพิ่มพนักงาน';
   document.getElementById('addEmployeeModal').classList.add('open');
 }
 function saveEmployee() {
-  const name=document.getElementById('empName').value.trim();
-  const team=document.getElementById('empTeamSel').value;
-  const phone=document.getElementById('empPhone').value.trim();
+  const name  = document.getElementById('empName').value.trim();
+  const team  = document.getElementById('empTeamSel').value;
+  const phone = document.getElementById('empPhone').value.trim();
   if(!name){toast('กรุณากรอกชื่อ','err');return;}
-  DB.employees.push({id:uid(),name,team,phone,active:true});
-  scheduleSave(); closeModal('addEmployeeModal'); renderMasterEmp(); toast('เพิ่มพนักงานแล้ว ✓','ok');
+  const editId = document.getElementById('addEmployeeModal').dataset.editId;
+  if (editId) {
+    const e = DB.employees.find(x=>x.id===editId);
+    if (e) { e.name=name; e.team=team; e.phone=phone; }
+  } else {
+    DB.employees.push({id:uid(),name,team,phone,active:true});
+  }
+  scheduleSave(); closeModal('addEmployeeModal'); renderMasterEmp();
+  toast(editId?'แก้ไขพนักงานแล้ว ✓':'เพิ่มพนักงานแล้ว ✓','ok');
 }
-function toggleEmp(id) { const e=DB.employees.find(x=>x.id===id); if(e){e.active=!e.active;scheduleSave();renderMasterEmp();} }
-function delEmp(id) { if(!confirm('ลบพนักงาน?'))return; DB.employees=DB.employees.filter(e=>e.id!==id); scheduleSave();renderMasterEmp(); }
+
+// ── Edit Vehicle ───────────────────────────────────
+function openEditVeh(id) {
+  const v = DB.vehicles.find(x=>x.id===id); if(!v) return;
+  document.getElementById('vehPlate').value = v.plate||'';
+  document.getElementById('vehType').value  = v.type||'รถกระบะ';
+  populateDropdowns();
+  document.getElementById('vehTeam').value  = v.team||'';
+  document.getElementById('addVehicleModal').dataset.editId = id;
+  document.getElementById('addVehModalTitle').textContent = '✏️ แก้ไขข้อมูลรถ';
+  document.getElementById('addVehicleModal').classList.add('open');
+}
 function openAddVehicleModal() {
   document.getElementById('vehPlate').value='';
   populateDropdowns();
   document.getElementById('vehTeam').value='';
+  delete document.getElementById('addVehicleModal').dataset.editId;
+  document.getElementById('addVehModalTitle').textContent = '🚗 เพิ่มรถยนต์';
   document.getElementById('addVehicleModal').classList.add('open');
 }
 function saveVehicle() {
-  const plate=document.getElementById('vehPlate').value.trim();
-  const type=document.getElementById('vehType').value;
-  const team=document.getElementById('vehTeam').value;
+  const plate = document.getElementById('vehPlate').value.trim();
+  const type  = document.getElementById('vehType').value;
+  const team  = document.getElementById('vehTeam').value;
   if(!plate){toast('กรุณากรอกทะเบียน','err');return;}
-  DB.vehicles.push({id:uid(),plate,type,team,active:true});
-  scheduleSave(); closeModal('addVehicleModal'); renderMasterVeh(); toast('เพิ่มรถแล้ว ✓','ok');
+  const editId = document.getElementById('addVehicleModal').dataset.editId;
+  if (editId) {
+    const v = DB.vehicles.find(x=>x.id===editId);
+    if (v) { v.plate=plate; v.type=type; v.team=team; }
+  } else {
+    DB.vehicles.push({id:uid(),plate,type,team,active:true});
+  }
+  scheduleSave(); closeModal('addVehicleModal'); renderMasterVeh();
+  toast(editId?'แก้ไขรถแล้ว ✓':'เพิ่มรถแล้ว ✓','ok');
 }
-function delVeh(id) { if(!confirm('ลบรถ?'))return; DB.vehicles=DB.vehicles.filter(v=>v.id!==id); scheduleSave();renderMasterVeh(); }
+
 
 // ─── COPY PLAN ────────────────────────────────────
 function openCopyPlanModal() {
