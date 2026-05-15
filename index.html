@@ -357,6 +357,15 @@ nav{flex:1;padding:8px 0;overflow-y:auto}
 /* status dot on calendar pill */
 .st-dot{width:5px;height:5px;border-radius:50%;display:inline-block;flex-shrink:0;margin-right:2px}
 
+
+/* Export modal scope buttons */
+.report-scope-btn { border-radius: 20px !important; }
+.report-scope-btn.active-scope {
+  background: var(--accent) !important;
+  color: #fff !important;
+  border-color: var(--accent) !important;
+}
+
 </style>
 </head>
 <body>
@@ -403,6 +412,7 @@ nav{flex:1;padding:8px 0;overflow-y:auto}
   <div class="mob-title" id="mobTitle">📅 ปฏิทินแผนงาน</div>
   <div class="mob-actions">
     <button class="btn btn-ghost btn-sm" onclick="manualSync()" style="padding:5px 10px">🔄</button>
+    <button class="btn btn-ghost btn-sm" onclick="openExportModal()" style="padding:5px 10px">📊</button>
     <button class="btn btn-ghost btn-sm" onclick="changeMonth(-1)" style="padding:5px 8px">‹</button>
     <span id="mobMonthLabel" style="font-size:12px;font-weight:700;min-width:64px;text-align:center"></span>
     <button class="btn btn-ghost btn-sm" onclick="changeMonth(1)" style="padding:5px 8px">›</button>
@@ -469,6 +479,7 @@ nav{flex:1;padding:8px 0;overflow-y:auto}
     <div class="topbar-title" id="viewTitle">📅 ปฏิทินแผนงาน</div>
     <div class="topbar-actions">
       <button class="btn btn-ghost" id="btnAddJob" onclick="openAddJobModal(null)">+ เพิ่มงาน</button>
+      <button class="btn btn-ghost" onclick="openExportModal()">📊 สรุปงาน</button>
       <button class="btn btn-primary" onclick="openCopyPlanModal()">📋 คัดลอกแผน</button>
     </div>
   </div>
@@ -812,6 +823,59 @@ nav{flex:1;padding:8px 0;overflow-y:auto}
 </div>
 
 <div id="toast"></div>
+
+<!-- EXPORT / REPORT MODAL -->
+<div class="modal-overlay" id="exportModal">
+  <div class="modal" style="width:560px;max-height:92vh">
+    <div class="modal-header">
+      <h2>📊 สรุปรายงานประชุม</h2>
+      <button class="modal-close" onclick="closeModal('exportModal')">✕</button>
+    </div>
+    <div class="modal-body" style="padding:14px 20px">
+
+      <!-- Report scope selector -->
+      <div style="display:flex;gap:6px;margin-bottom:14px;flex-wrap:wrap">
+        <button class="btn btn-ghost btn-sm report-scope-btn active-scope" onclick="setReportScope('week',this)">สัปดาห์นี้</button>
+        <button class="btn btn-ghost btn-sm report-scope-btn" onclick="setReportScope('nextweek',this)">สัปดาห์หน้า</button>
+        <button class="btn btn-ghost btn-sm report-scope-btn" onclick="setReportScope('month',this)">ทั้งเดือน</button>
+        <button class="btn btn-ghost btn-sm report-scope-btn" onclick="setReportScope('issues',this)">งานมีปัญหา</button>
+      </div>
+
+      <!-- Report preview -->
+      <div id="reportPreview" style="background:var(--bg3);border:1px solid var(--border);border-radius:10px;padding:16px;max-height:52vh;overflow-y:auto;font-size:13px;line-height:1.8;white-space:pre-wrap;font-family:'Sarabun',sans-serif"></div>
+
+    </div>
+    <div class="modal-footer" style="gap:8px;flex-wrap:wrap">
+      <button class="btn btn-ghost" onclick="closeModal('exportModal')">ปิด</button>
+      <button class="btn btn-ghost" onclick="copyReportText()" style="gap:5px">📋 Copy ส่ง LINE</button>
+      <button class="btn btn-primary" onclick="printReport()">🖨 พิมพ์ / PDF</button>
+    </div>
+  </div>
+</div>
+
+<!-- PRINT STYLES -->
+<style id="printStyles">
+@media print {
+  body > *:not(#printArea) { display:none!important; }
+  #printArea {
+    display:block!important;
+    font-family:'Sarabun',sans-serif;
+    font-size:13pt;
+    color:#000;
+    padding:16mm 20mm;
+  }
+  #printArea h1{font-size:18pt;margin-bottom:4pt}
+  #printArea h2{font-size:14pt;margin:12pt 0 4pt;border-bottom:1pt solid #ccc;padding-bottom:3pt}
+  #printArea h3{font-size:12pt;margin:8pt 0 2pt;color:#333}
+  #printArea .pr-badge{display:inline-block;border:1pt solid;border-radius:4pt;padding:1pt 5pt;font-size:10pt}
+  #printArea table{width:100%;border-collapse:collapse;margin:6pt 0}
+  #printArea th,#printArea td{border:0.5pt solid #aaa;padding:4pt 6pt;font-size:11pt;text-align:left}
+  #printArea th{background:#f0f0f0;font-weight:bold}
+  #printArea .page-break{page-break-before:always}
+}
+</style>
+<div id="printArea" style="display:none"></div>
+
 
 <!-- SCRIPT SETTINGS MODAL -->
 <div class="modal-overlay" id="scriptSettingsModal">
@@ -1982,6 +2046,249 @@ function updateBottomNav(name) {
   if (mobTitle) mobTitle.textContent = titles[name] || '';
 }
 function isMobile() { return window.innerWidth <= 640; }
+
+
+// ─── EXPORT / REPORT ──────────────────────────────
+let reportScope = 'week';
+
+function openExportModal() {
+  reportScope = 'week';
+  document.querySelectorAll('.report-scope-btn').forEach(b=>b.classList.remove('active-scope'));
+  document.querySelector('.report-scope-btn').classList.add('active-scope');
+  generateReport();
+  document.getElementById('exportModal').classList.add('open');
+}
+
+function setReportScope(scope, btn) {
+  reportScope = scope;
+  document.querySelectorAll('.report-scope-btn').forEach(b=>b.classList.remove('active-scope'));
+  btn.classList.add('active-scope');
+  generateReport();
+}
+
+// ── หาช่วงวันของสัปดาห์ ──
+function getWeekRange(offsetWeeks) {
+  const today = new Date();
+  const dow = today.getDay() === 0 ? 6 : today.getDay() - 1; // Mon=0
+  const mon = new Date(today); mon.setDate(today.getDate() - dow + offsetWeeks * 7);
+  const sun = new Date(mon);   sun.setDate(mon.getDate() + 6);
+  return { start: formatDate(mon), end: formatDate(sun) };
+}
+
+function getDatesInRange(start, end) {
+  const dates = []; const d = new Date(start + 'T00:00:00');
+  const e = new Date(end + 'T00:00:00');
+  while (d <= e) { dates.push(formatDate(d)); d.setDate(d.getDate()+1); }
+  return dates;
+}
+
+// ── Generate report text ──────────────────────────
+function generateReport() {
+  const lines = [];
+  const month = thaiMonthLabel(DB.currentMonth);
+  const now = new Date();
+  const nowStr = `${now.getDate()}/${now.getMonth()+1}/${now.getFullYear()+543} ${String(now.getHours()).padStart(2,'0')}:${String(now.getMinutes()).padStart(2,'0')}`;
+
+  if (reportScope === 'week' || reportScope === 'nextweek') {
+    const offset = reportScope === 'week' ? 0 : 1;
+    const {start, end} = getWeekRange(offset);
+    const label = reportScope === 'week' ? 'สัปดาห์นี้' : 'สัปดาห์หน้า';
+    const dates = getDatesInRange(start, end);
+    const wJobs = DB.scheduled.filter(j=>j.dates.some(d=>dates.includes(d)));
+
+    lines.push(`📋 สรุปแผนงาน${label}`);
+    lines.push(`📅 ${thaiDate(start)} — ${thaiDate(end)}`);
+    lines.push(`🕐 ออกรายงาน: ${nowStr}`);
+    lines.push('─'.repeat(36));
+
+    // Overview
+    const done     = wJobs.filter(j=>j.status==='done').length;
+    const progress = wJobs.filter(j=>j.status==='progress').length;
+    const issue    = wJobs.filter(j=>j.status==='issue').length;
+    const pending  = wJobs.filter(j=>!j.status||j.status==='pending').length;
+    const cancel   = wJobs.filter(j=>j.status==='cancel').length;
+    lines.push(`\n📊 ภาพรวม (${wJobs.length} งาน)`);
+    lines.push(`  ✅ เสร็จแล้ว         ${done} งาน`);
+    lines.push(`  🔄 กำลังดำเนินการ    ${progress} งาน`);
+    lines.push(`  ⏳ รอดำเนินการ       ${pending} งาน`);
+    lines.push(`  ⚠️  มีปัญหา           ${issue} งาน`);
+    lines.push(`  ❌ ยกเลิก            ${cancel} งาน`);
+
+    // By day
+    lines.push(`\n📅 แผนงานรายวัน`);
+    const dayNames = ['อาทิตย์','จันทร์','อังคาร','พุธ','พฤหัสบดี','ศุกร์','เสาร์'];
+    dates.forEach(ds => {
+      const dayJobs = wJobs.filter(j=>j.dates.includes(ds));
+      if (!dayJobs.length) return;
+      const [y,m,d] = ds.split('-').map(Number);
+      const dow = dayNames[new Date(y,m-1,d).getDay()];
+      lines.push(`\n  📌 ${d} — วัน${dow} ${thaiDate(ds).split(' ').slice(1).join(' ')}`);
+      dayJobs.forEach(j => {
+        const emps = j.employees.map(eid=>DB.employees.find(e=>e.id===eid)?.name||'?').join(', ');
+        const veh  = j.vehicleId ? DB.vehicles.find(v=>v.id===j.vehicleId)?.plate||'' : '';
+        const stIco = {pending:'⏳',progress:'🔄',done:'✅',issue:'⚠️',cancel:'❌'}[j.status||'pending'];
+        lines.push(`  ${stIco} [${j.type||'?'}] ${j.jobCode?j.jobCode+' ':''}${j.jobName}`);
+        if (emps) lines.push(`       👤 ${emps}`);
+        if (veh)  lines.push(`       🚗 ${veh}`);
+        if (j.statusNote) lines.push(`       💬 ${j.statusNote}`);
+        if (j.note) lines.push(`       📝 ${j.note}`);
+      });
+    });
+
+    // Issues
+    const issueJobs = wJobs.filter(j=>j.status==='issue');
+    if (issueJobs.length) {
+      lines.push(`\n⚠️  งานที่ต้องติดตาม (${issueJobs.length} งาน)`);
+      issueJobs.forEach(j => {
+        const emps = j.employees.map(eid=>DB.employees.find(e=>e.id===eid)?.name||'?').join(', ');
+        lines.push(`  • ${j.jobCode?j.jobCode+' ':''}${j.jobName} — ${emps}`);
+        if (j.statusNote) lines.push(`    ↳ ${j.statusNote}`);
+      });
+    }
+
+    // Workload
+    lines.push(`\n👥 ภาระงานรายคน`);
+    const empLoad = {};
+    wJobs.forEach(j=>j.employees.forEach(eid=>{
+      if (!empLoad[eid]) empLoad[eid]={days:new Set(),jobs:0};
+      j.dates.filter(d=>dates.includes(d)).forEach(d=>empLoad[eid].days.add(d));
+      empLoad[eid].jobs++;
+    }));
+    Object.entries(empLoad).sort((a,b)=>b[1].days.size-a[1].days.size).forEach(([eid,v])=>{
+      const e = DB.employees.find(x=>x.id===eid);
+      if (e) lines.push(`  ${e.name.padEnd(10)} ${v.days.size} วัน / ${v.jobs} งาน`);
+    });
+
+  } else if (reportScope === 'month') {
+    const mJobs = DB.scheduled.filter(j=>j.dates.some(d=>d.startsWith(DB.currentMonth)));
+    lines.push(`📋 สรุปแผนงานประจำเดือน ${month}`);
+    lines.push(`🕐 ออกรายงาน: ${nowStr}`);
+    lines.push('─'.repeat(36));
+
+    const done     = mJobs.filter(j=>j.status==='done').length;
+    const progress = mJobs.filter(j=>j.status==='progress').length;
+    const issue    = mJobs.filter(j=>j.status==='issue').length;
+    const pending  = mJobs.filter(j=>!j.status||j.status==='pending').length;
+    const cancel   = mJobs.filter(j=>j.status==='cancel').length;
+    lines.push(`\n📊 สรุปภาพรวม (${mJobs.length} งานทั้งหมด)`);
+    lines.push(`  ✅ เสร็จแล้ว         ${done} งาน   (${mJobs.length?Math.round(done/mJobs.length*100):0}%)`);
+    lines.push(`  🔄 กำลังดำเนินการ    ${progress} งาน`);
+    lines.push(`  ⏳ รอดำเนินการ       ${pending} งาน`);
+    lines.push(`  ⚠️  มีปัญหา           ${issue} งาน`);
+    lines.push(`  ❌ ยกเลิก            ${cancel} งาน`);
+
+    // By type
+    lines.push(`\n📂 แยกตามประเภท`);
+    const typeNames = {S:'Site',W:'Water',F:'Factory',E:'EIA',M:'Mining',D:'รายวัน'};
+    Object.entries(typeNames).forEach(([t,name])=>{
+      const n = mJobs.filter(j=>j.type===t).length;
+      if (n) lines.push(`  [${t}] ${name.padEnd(12)} ${n} งาน`);
+    });
+
+    // Workload
+    lines.push(`\n👥 ภาระงานรายคน (เดือน${month})`);
+    const empLoad = {};
+    mJobs.forEach(j=>j.employees.forEach(eid=>{
+      if (!empLoad[eid]) empLoad[eid]={days:new Set(),jobs:0};
+      j.dates.filter(d=>d.startsWith(DB.currentMonth)).forEach(d=>empLoad[eid].days.add(d));
+      empLoad[eid].jobs++;
+    }));
+    Object.entries(empLoad).sort((a,b)=>b[1].days.size-a[1].days.size).forEach(([eid,v])=>{
+      const e = DB.employees.find(x=>x.id===eid);
+      if (e) lines.push(`  ${e.name.padEnd(10)} ${v.days.size} วัน / ${v.jobs} งาน`);
+    });
+
+    // Issues
+    const issueJobs = mJobs.filter(j=>j.status==='issue');
+    if (issueJobs.length) {
+      lines.push(`\n⚠️  งานมีปัญหาทั้งหมด (${issueJobs.length} งาน)`);
+      issueJobs.forEach(j=>{
+        const emps=j.employees.map(eid=>DB.employees.find(e=>e.id===eid)?.name||'?').join(', ');
+        const firstDate = j.dates.filter(d=>d.startsWith(DB.currentMonth)).sort()[0]||'';
+        const [y,m,d] = (firstDate||'0-0-0').split('-').map(Number);
+        lines.push(`  • ${firstDate?d+' '+thaiDate(firstDate).split(' ')[1]+' ':'' }${j.jobCode?j.jobCode+' ':''}${j.jobName}`);
+        if (emps) lines.push(`    👤 ${emps}`);
+        if (j.statusNote) lines.push(`    💬 ${j.statusNote}`);
+      });
+    }
+
+  } else if (reportScope === 'issues') {
+    const mJobs = DB.scheduled.filter(j=>j.dates.some(d=>d.startsWith(DB.currentMonth)));
+    const issueJobs = mJobs.filter(j=>j.status==='issue'||j.status==='progress');
+    lines.push(`⚠️  รายงานงานที่ต้องติดตาม — ${month}`);
+    lines.push(`🕐 ออกรายงาน: ${nowStr}`);
+    lines.push('─'.repeat(36));
+    if (!issueJobs.length) {
+      lines.push('\n✅ ไม่มีงานที่มีปัญหาในเดือนนี้');
+    } else {
+      const issues   = issueJobs.filter(j=>j.status==='issue');
+      const progress = issueJobs.filter(j=>j.status==='progress');
+      if (issues.length) {
+        lines.push(`\n⚠️  มีปัญหา (${issues.length} งาน)`);
+        issues.forEach(j=>{
+          const emps=j.employees.map(eid=>DB.employees.find(e=>e.id===eid)?.name||'?').join(', ');
+          const dates=j.dates.filter(d=>d.startsWith(DB.currentMonth)).sort();
+          lines.push(`\n  📌 ${j.jobCode?j.jobCode+' ':''}${j.jobName}`);
+          lines.push(`     👤 ${emps||'-'}`);
+          if (dates.length) {
+            const [y,m,d]=dates[0].split('-').map(Number);
+            lines.push(`     📅 วันที่ ${d} ${thaiDate(dates[0]).split(' ')[1]}`);
+          }
+          lines.push(`     💬 ${j.statusNote||'(ไม่มีหมายเหตุ)'}`);
+        });
+      }
+      if (progress.length) {
+        lines.push(`\n🔄 กำลังดำเนินการ (${progress.length} งาน)`);
+        progress.forEach(j=>{
+          const emps=j.employees.map(eid=>DB.employees.find(e=>e.id===eid)?.name||'?').join(', ');
+          lines.push(`  • ${j.jobCode?j.jobCode+' ':''}${j.jobName} — ${emps}`);
+          if (j.statusNote) lines.push(`    💬 ${j.statusNote}`);
+        });
+      }
+    }
+  }
+
+  lines.push('\n─'.repeat(36));
+  lines.push('WorkPlan — ระบบแผนงานรวม');
+
+  document.getElementById('reportPreview').textContent = lines.join('\n');
+}
+
+// ── Copy to clipboard ─────────────────────────────
+function copyReportText() {
+  const text = document.getElementById('reportPreview').textContent;
+  navigator.clipboard.writeText(text).then(()=>toast('คัดลอกแล้ว — วางใน LINE ได้เลย ✓','ok'));
+}
+
+// ── Print / PDF ───────────────────────────────────
+function printReport() {
+  const text = document.getElementById('reportPreview').textContent;
+  const month = thaiMonthLabel(DB.currentMonth);
+
+  // Build print HTML
+  const lines = text.split('\n');
+  let printHtml = '';
+  lines.forEach(line => {
+    const t = line.trim();
+    if (!t) { printHtml += '<br>'; return; }
+    if (t.startsWith('📋') || t.startsWith('⚠️  ร')) {
+      printHtml += `<h1>${t}</h1>`;
+    } else if (t.startsWith('📊') || t.startsWith('📅 แผน') || t.startsWith('👥') || t.startsWith('📂') || t.startsWith('⚠️') || t.startsWith('🔄 กำลัง') && t.includes('งาน')) {
+      printHtml += `<h2>${t}</h2>`;
+    } else if (t.startsWith('📌')) {
+      printHtml += `<h3>${t}</h3>`;
+    } else if (t.startsWith('─')) {
+      printHtml += '<hr style="border:none;border-top:1pt solid #ddd;margin:6pt 0">';
+    } else {
+      printHtml += `<div style="padding:1pt 0">${t}</div>`;
+    }
+  });
+
+  document.getElementById('printArea').innerHTML = printHtml;
+  document.getElementById('printArea').style.display = 'block';
+  window.print();
+  setTimeout(()=>{ document.getElementById('printArea').style.display='none'; }, 1000);
+}
 
 // ─── BOOT ─────────────────────────────────────────
 if (GAS_URL && GAS_ROOM) {
