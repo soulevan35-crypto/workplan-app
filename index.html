@@ -320,6 +320,43 @@ nav{flex:1;padding:8px 0;overflow-y:auto}
   #empSearchInput   { width: 100% !important; }
 }
 
+
+/* ── Job Status ─────────────────────────────── */
+.status-badge {
+  display:inline-flex;align-items:center;gap:4px;
+  border-radius:20px;padding:3px 10px;font-size:12px;font-weight:600;
+  border:1.5px solid;cursor:pointer;transition:all .15s;
+  -webkit-tap-highlight-color:transparent;
+}
+.status-badge:active{transform:scale(.95)}
+.st-pending  {background:rgba(107,116,148,.12);color:#9ba3bf;border-color:rgba(107,116,148,.3)}
+.st-progress {background:rgba(245,166,35,.12);color:#f5a623;border-color:rgba(245,166,35,.3)}
+.st-done     {background:rgba(52,201,138,.12);color:#34c98a;border-color:rgba(52,201,138,.3)}
+.st-issue    {background:rgba(240,90,90,.12);color:#f05a5a;border-color:rgba(240,90,90,.3)}
+.st-cancel   {background:rgba(155,110,243,.12);color:#9b6ef3;border-color:rgba(155,110,243,.3)}
+
+/* inline status note input */
+.status-note-row {
+  display:flex;align-items:center;gap:6px;margin-top:6px;
+  background:var(--bg);border:1px solid var(--border);border-radius:8px;
+  padding:5px 8px;
+}
+.status-note-row input {
+  flex:1;background:transparent;border:none;outline:none;
+  font-family:'Sarabun',sans-serif;font-size:13px;color:var(--text);
+  min-width:0;
+}
+.status-note-row input::placeholder{color:var(--text3)}
+.status-note-save {
+  background:var(--accent);color:#fff;border:none;border-radius:6px;
+  padding:3px 10px;font-family:'Sarabun',sans-serif;font-size:12px;font-weight:600;
+  cursor:pointer;flex-shrink:0;
+}
+.status-note-save:active{opacity:.8}
+
+/* status dot on calendar pill */
+.st-dot{width:5px;height:5px;border-radius:50%;display:inline-block;flex-shrink:0;margin-right:2px}
+
 </style>
 </head>
 <body>
@@ -626,7 +663,19 @@ nav{flex:1;padding:8px 0;overflow-y:auto}
         <select class="form-select" id="jobVehicle"></select>
       </div>
       <div class="form-group">
-        <label class="form-label">หมายเหตุ</label>
+        <label class="form-label">สถานะงาน</label>
+        <div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:8px" id="statusBtnGroup">
+          <button type="button" class="status-badge st-pending"  onclick="setJobStatusBtn('pending')"  id="stbtn-pending">⏳ รอดำเนินการ</button>
+          <button type="button" class="status-badge st-progress" onclick="setJobStatusBtn('progress')" id="stbtn-progress">🔄 กำลังดำเนินการ</button>
+          <button type="button" class="status-badge st-done"     onclick="setJobStatusBtn('done')"     id="stbtn-done">✅ เสร็จแล้ว</button>
+          <button type="button" class="status-badge st-issue"    onclick="setJobStatusBtn('issue')"    id="stbtn-issue">⚠️ มีปัญหา</button>
+          <button type="button" class="status-badge st-cancel"   onclick="setJobStatusBtn('cancel')"   id="stbtn-cancel">❌ ยกเลิก</button>
+        </div>
+        <input type="hidden" id="jobStatus" value="pending">
+        <input class="form-input" id="jobStatusNote" placeholder="หมายเหตุสถานะ เช่น รอลูกค้ายืนยัน, ติดปัญหาน้ำ..." style="font-size:13px">
+      </div>
+      <div class="form-group">
+        <label class="form-label">หมายเหตุงาน</label>
         <textarea class="form-textarea" id="jobNote" placeholder="เช่น นัดแล้ว 10:00, ก่อนเที่ยง..."></textarea>
       </div>
     </div>
@@ -1074,6 +1123,77 @@ function changeMonth(dir) {
   renderCurrentView();
 }
 
+
+// ─── JOB STATUS ───────────────────────────────────
+const STATUS_CONFIG = {
+  pending:  {cls:'st-pending',  label:'⏳ รอดำเนินการ'},
+  progress: {cls:'st-progress', label:'🔄 กำลังดำเนินการ'},
+  done:     {cls:'st-done',     label:'✅ เสร็จแล้ว'},
+  issue:    {cls:'st-issue',    label:'⚠️ มีปัญหา'},
+  cancel:   {cls:'st-cancel',   label:'❌ ยกเลิก'},
+};
+const STATUS_DOT = {
+  pending:'#6b7494', progress:'#f5a623', done:'#34c98a', issue:'#f05a5a', cancel:'#9b6ef3'
+};
+
+function setJobStatusBtn(val) {
+  document.getElementById('jobStatus').value = val;
+  // highlight active button
+  Object.keys(STATUS_CONFIG).forEach(k => {
+    const btn = document.getElementById('stbtn-'+k);
+    if (!btn) return;
+    if (k === val) {
+      btn.style.opacity = '1';
+      btn.style.transform = 'scale(1.05)';
+      btn.style.boxShadow = '0 0 0 2px currentColor';
+    } else {
+      btn.style.opacity = '0.45';
+      btn.style.transform = '';
+      btn.style.boxShadow = '';
+    }
+  });
+}
+
+function initStatusButtons(currentStatus) {
+  const s = currentStatus || 'pending';
+  document.getElementById('jobStatus').value = s;
+  Object.keys(STATUS_CONFIG).forEach(k => {
+    const btn = document.getElementById('stbtn-'+k);
+    if (!btn) return;
+    if (k === s) {
+      btn.style.opacity='1'; btn.style.transform='scale(1.05)';
+      btn.style.boxShadow='0 0 0 2px currentColor';
+    } else {
+      btn.style.opacity='0.45'; btn.style.transform=''; btn.style.boxShadow='';
+    }
+  });
+}
+
+function statusBadgeHtml(status, note) {
+  const s = STATUS_CONFIG[status] || STATUS_CONFIG.pending;
+  return `<span class="status-badge ${s.cls}" style="font-size:11px;padding:2px 8px">${s.label}${note?' · '+note:''}</span>`;
+}
+
+// อัพเดทสถานะตรงๆ จาก day panel (ไม่ต้องเปิด modal)
+function quickUpdateStatus(jobId, newStatus) {
+  const j = DB.scheduled.find(x=>x.id===jobId); if(!j) return;
+  j.status = newStatus;
+  scheduleSave();
+  renderCalendar();
+  if (panelDate) refreshPanel();
+  toast(STATUS_CONFIG[newStatus]?.label + ' ✓', 'ok');
+}
+
+function saveStatusNote(jobId) {
+  const j = DB.scheduled.find(x=>x.id===jobId); if(!j) return;
+  const inp = document.getElementById('statusnote-'+jobId);
+  if (!inp) return;
+  j.statusNote = inp.value.trim();
+  scheduleSave();
+  if (panelDate) refreshPanel();
+  toast('บันทึกหมายเหตุแล้ว ✓','ok');
+}
+
 // ─── CALENDAR ─────────────────────────────────────
 const HOLIDAYS = {
   '2026-01-01':'วันขึ้นปีใหม่','2026-04-06':'วันจักรี',
@@ -1091,7 +1211,7 @@ function renderCalendar() {
     <div class="stat-card"><div class="stat-label">งานในเดือนนี้</div><div class="stat-value" style="color:var(--accent)">${mJobs.length}</div><div class="stat-sub">รายการ</div></div>
     <div class="stat-card"><div class="stat-label">วันที่มีงาน</div><div class="stat-value" style="color:var(--green)">${daySet.size}</div><div class="stat-sub">วัน</div></div>
     <div class="stat-card"><div class="stat-label">พนักงาน assign</div><div class="stat-value" style="color:var(--amber)">${empSet.size}</div><div class="stat-sub">คน</div></div>
-    <div class="stat-card"><div class="stat-label">งาน E (EIA)</div><div class="stat-value" style="color:var(--red)">${mJobs.filter(j=>j.type==='E').length}</div><div class="stat-sub">รายการ</div></div>
+    <div class="stat-card"><div class="stat-label">เสร็จแล้ว</div><div class="stat-value" style="color:var(--green)">${mJobs.filter(j=>j.status==='done').length}</div><div class="stat-sub">/ ${mJobs.length} งาน</div></div>
   `;
   // Type legend below stats
   const legendEl = document.getElementById('typeLegend');
@@ -1130,8 +1250,10 @@ function renderCalendar() {
     const holH = isHol ? `<span class="holiday-label">🎌 ${HOLIDAYS[ds]}</span>` : '';
     const pills = jobs.slice(0,4).map(j => {
       const c = teamColor(j.team);
+      const dotColor = STATUS_DOT[j.status||'pending'];
       return `<div class="cal-job-pill" style="background:${c}1a;color:${c};border-left-color:${c}"
-        onclick="event.stopPropagation();openJobEdit('${j.id}')">${j.jobCode?j.jobCode+' ':''}${j.jobName.slice(0,16)}${j.jobName.length>16?'…':''}</div>`;
+        onclick="event.stopPropagation();openJobEdit('${j.id}')">
+        <span class="st-dot" style="background:${dotColor}"></span>${j.jobCode?j.jobCode+' ':''}${j.jobName.slice(0,14)}${j.jobName.length>14?'…':''}</div>`;
     }).join('');
     const more = jobs.length>4 ? `<div class="cal-more">+${jobs.length-4} งาน</div>` : '';
     div.innerHTML = `<div class="cal-day-num">${dn}${holH}</div><div class="cal-jobs">${pills}${more}</div><button class="add-job-inline" title="เพิ่มงานวันที่ ${cell.day}">+</button>`;
@@ -1163,13 +1285,27 @@ function refreshPanel() {
     const c = teamColor(j.team);
     const emps = j.employees.map(eid => DB.employees.find(e=>e.id===eid)?.name||'?').join(', ');
     const veh = j.vehicleId ? DB.vehicles.find(v=>v.id===j.vehicleId)?.plate||'' : '';
+    const st = j.status || 'pending';
+    // quick status buttons
+    const stBtns = Object.entries(STATUS_CONFIG).map(([k,v])=>
+      `<button class="status-badge ${v.cls}" style="${k===st?'':'opacity:.4'};font-size:11px;padding:2px 8px"
+        onclick="quickUpdateStatus('${j.id}','${k}')">${v.label}</button>`
+    ).join('');
     return `<div class="day-job-card" style="border-left-color:${c}">
       <div class="day-job-code">${j.jobCode||''} ${typeBadge(j.type)}</div>
       <div class="day-job-name">${j.jobName}</div>
-      <div class="day-job-meta">
+      <div class="day-job-meta" style="margin-bottom:6px">
         ${emps ? `<span class="meta-chip">👤 ${emps}</span>` : ''}
         ${veh ? `<span class="meta-chip">🚗 ${veh}</span>` : ''}
         ${j.note ? `<span class="meta-chip">📝 ${j.note}</span>` : ''}
+      </div>
+      <div style="font-size:11px;color:var(--text3);margin-bottom:4px;font-weight:600">สถานะ</div>
+      <div style="display:flex;flex-wrap:wrap;gap:4px;margin-bottom:6px">${stBtns}</div>
+      <div class="status-note-row">
+        <input id="statusnote-${j.id}" value="${(j.statusNote||'').replace(/"/g,'&quot;')}"
+          placeholder="หมายเหตุสถานะ เช่น รอลูกค้า, ส่งรายงานแล้ว..."
+          onkeydown="if(event.key==='Enter')saveStatusNote('${j.id}')">
+        <button class="status-note-save" onclick="saveStatusNote('${j.id}')">บันทึก</button>
       </div>
       <div style="display:flex;gap:6px;margin-top:8px">
         <button class="btn btn-ghost btn-sm" onclick="openJobEdit('${j.id}')">✏️ แก้ไข</button>
@@ -1197,6 +1333,8 @@ function openAddJobModal(dateStr) {
   document.getElementById('jobDays').value = 1;
   document.getElementById('jobType').value = '';
   document.getElementById('jobNote').value = '';
+  document.getElementById('jobStatusNote').value = '';
+  initStatusButtons('pending');
   document.getElementById('conflictBanner').classList.remove('show');
   populateDropdowns();
   document.getElementById('jobTeam').value = '';
@@ -1219,6 +1357,8 @@ function openJobEdit(id) {
   document.getElementById('jobDays').value = j.dates.length;
   document.getElementById('jobType').value = j.type || '';
   document.getElementById('jobNote').value = j.note || '';
+  document.getElementById('jobStatusNote').value = j.statusNote || '';
+  initStatusButtons(j.status || 'pending');
   document.getElementById('conflictBanner').classList.remove('show');
   populateDropdowns();
   document.getElementById('jobTeam').value = j.team || '';
@@ -1264,6 +1404,8 @@ function saveJob() {
   const team = document.getElementById('jobTeam').value;
   const vehId = document.getElementById('jobVehicle').value;
   const note = document.getElementById('jobNote').value.trim();
+  const status = document.getElementById('jobStatus').value || 'pending';
+  const statusNote = document.getElementById('jobStatusNote').value.trim();
   const employees = [...document.querySelectorAll('#empSelectGrid input:checked')].map(i=>i.value);
   let jobCode='', jobName='';
   if (selMasterJobId) {
@@ -1281,7 +1423,7 @@ function saveJob() {
     document.getElementById('conflictMsg').textContent = conflicts[0] + (conflicts.length>1?` (+${conflicts.length-1} รายการ)`:'');
     document.getElementById('conflictBanner').classList.add('show');
   }
-  const rec = {id:editingJobId||uid(), masterJobId:selMasterJobId, jobCode, jobName, type, team, dates, employees, vehicleId:vehId, note};
+  const rec = {id:editingJobId||uid(), masterJobId:selMasterJobId, jobCode, jobName, type, team, dates, employees, vehicleId:vehId, note, status, statusNote};
   if (editingJobId) {
     const idx = DB.scheduled.findIndex(j=>j.id===editingJobId);
     if (idx>=0) DB.scheduled[idx]=rec;
@@ -1434,12 +1576,16 @@ function openEmpSheet(empId, highlightDs) {
           const jc = teamColor(j.team);
           const emps = j.employees.map(eid=>DB.employees.find(e=>e.id===eid)?.name||'?').join(', ');
           const veh = j.vehicleId ? DB.vehicles.find(v=>v.id===j.vehicleId)?.plate||'' : '';
+          const jst = j.status||'pending';
+          const jstCfg = STATUS_CONFIG[jst]||STATUS_CONFIG.pending;
           return `<div class="sheet-job-card" style="border-left-color:${jc}">
             <div style="display:flex;align-items:center;gap:6px;margin-bottom:4px">
               ${typeBadge(j.type)}
               <span style="font-family:'IBM Plex Mono',monospace;font-size:11px;color:var(--text3)">${j.jobCode||''}</span>
+              <span class="status-badge ${jstCfg.cls}" style="font-size:10px;padding:1px 7px;margin-left:auto">${jstCfg.label}</span>
             </div>
             <div style="font-size:14px;font-weight:700;margin-bottom:5px">${j.jobName}</div>
+            ${j.statusNote?`<div style="font-size:12px;color:var(--amber);margin-bottom:4px">💬 ${j.statusNote}</div>`:''}
             <div style="display:flex;flex-wrap:wrap;gap:5px">
               ${emps?`<span class="meta-chip">👤 ${emps}</span>`:''}
               ${veh?`<span class="meta-chip">🚗 ${veh}</span>`:''}
