@@ -366,6 +366,37 @@ nav{flex:1;padding:8px 0;overflow-y:auto}
   border-color: var(--accent) !important;
 }
 
+
+/* ── Job Action (ลักษณะงาน) ─────────────────── */
+.action-btn-group { display:flex; gap:5px; flex-wrap:wrap; }
+.action-btn {
+  display:inline-flex; align-items:center; gap:4px;
+  padding:5px 12px; border-radius:8px; font-size:12px; font-weight:700;
+  cursor:pointer; border:1.5px solid; transition:all .12s;
+  font-family:'Sarabun',sans-serif; background:transparent;
+  -webkit-tap-highlight-color:transparent;
+}
+.action-btn:active { transform:scale(.93); }
+.action-btn.sel { color:#fff !important; }
+.ab-install  { color:#4f8ef7; border-color:#4f8ef740; }
+.ab-install.sel  { background:#4f8ef7; border-color:#4f8ef7; }
+.ab-collect  { color:#f5a623; border-color:#f5a62340; }
+.ab-collect.sel  { background:#f5a623; border-color:#f5a623; }
+.ab-inspect  { color:#34c98a; border-color:#34c98a40; }
+.ab-inspect.sel  { background:#34c98a; border-color:#34c98a; }
+.ab-repair   { color:#f05a5a; border-color:#f05a5a40; }
+.ab-repair.sel   { background:#f05a5a; border-color:#f05a5a; }
+.ab-daily    { color:#2ec4b6; border-color:#2ec4b640; }
+.ab-daily.sel    { background:#2ec4b6; border-color:#2ec4b6; }
+.ab-other    { color:#9b6ef3; border-color:#9b6ef340; }
+.ab-other.sel    { background:#9b6ef3; border-color:#9b6ef3; }
+
+/* action tag in pill / chip */
+.action-tag {
+  font-size:9px; font-weight:800; padding:1px 4px;
+  border-radius:3px; opacity:.9; flex-shrink:0;
+}
+
 </style>
 </head>
 <body>
@@ -647,6 +678,19 @@ nav{flex:1;padding:8px 0;overflow-y:auto}
           <input type="number" class="form-input" id="jobDays" value="1" min="1" max="180">
         </div>
       </div>
+      <div class="form-group">
+        <label class="form-label">ลักษณะงาน</label>
+        <div class="action-btn-group" id="actionBtnGroup">
+          <button type="button" class="action-btn ab-install" onclick="setActionBtn('install')"  id="abtn-install">🔧 ตั้งเครื่อง</button>
+          <button type="button" class="action-btn ab-collect" onclick="setActionBtn('collect')"  id="abtn-collect">📦 เก็บเครื่อง</button>
+          <button type="button" class="action-btn ab-inspect" onclick="setActionBtn('inspect')"  id="abtn-inspect">🔍 ตรวจสอบ</button>
+          <button type="button" class="action-btn ab-repair"  onclick="setActionBtn('repair')"   id="abtn-repair">🛠 ซ่อมบำรุง</button>
+          <button type="button" class="action-btn ab-daily"   onclick="setActionBtn('daily')"    id="abtn-daily">📋 ประจำวัน</button>
+          <button type="button" class="action-btn ab-other"   onclick="setActionBtn('other')"    id="abtn-other">💬 อื่นๆ</button>
+        </div>
+        <input type="hidden" id="jobAction" value="">
+      </div>
+
       <div class="form-row">
         <div class="form-group">
           <label class="form-label">ประเภทงาน</label>
@@ -1188,6 +1232,55 @@ function changeMonth(dir) {
 }
 
 
+
+// ─── JOB ACTION (ลักษณะงาน) ──────────────────────
+const ACTION_CONFIG = {
+  install: { cls:'ab-install', label:'🔧 ตั้งเครื่อง',  short:'ตั้ง',  color:'#4f8ef7' },
+  collect: { cls:'ab-collect', label:'📦 เก็บเครื่อง',  short:'เก็บ',  color:'#f5a623' },
+  inspect: { cls:'ab-inspect', label:'🔍 ตรวจสอบ',       short:'ตรวจ', color:'#34c98a' },
+  repair:  { cls:'ab-repair',  label:'🛠 ซ่อมบำรุง',     short:'ซ่อม', color:'#f05a5a' },
+  daily:   { cls:'ab-daily',   label:'📋 ประจำวัน',      short:'วัน',  color:'#2ec4b6' },
+  other:   { cls:'ab-other',   label:'💬 อื่นๆ',         short:'อื่น', color:'#9b6ef3' },
+};
+
+function setActionBtn(val) {
+  document.getElementById('jobAction').value = val;
+  Object.keys(ACTION_CONFIG).forEach(k => {
+    const btn = document.getElementById('abtn-'+k);
+    if (!btn) return;
+    if (k === val) {
+      btn.classList.add('sel');
+      btn.style.transform = 'scale(1.05)';
+    } else {
+      btn.classList.remove('sel');
+      btn.style.transform = '';
+    }
+  });
+}
+
+function initActionBtn(val) {
+  const v = val || '';
+  document.getElementById('jobAction').value = v;
+  Object.keys(ACTION_CONFIG).forEach(k => {
+    const btn = document.getElementById('abtn-'+k);
+    if (!btn) return;
+    if (k === v) { btn.classList.add('sel'); btn.style.transform='scale(1.05)'; }
+    else         { btn.classList.remove('sel'); btn.style.transform=''; }
+  });
+}
+
+function actionTagHtml(action) {
+  if (!action || !ACTION_CONFIG[action]) return '';
+  const a = ACTION_CONFIG[action];
+  return `<span class="action-tag" style="background:${a.color}30;color:${a.color}">${a.short}</span>`;
+}
+
+function actionLabelHtml(action) {
+  if (!action || !ACTION_CONFIG[action]) return '';
+  const a = ACTION_CONFIG[action];
+  return `<span class="action-btn ${a.cls} sel" style="font-size:11px;padding:2px 9px;pointer-events:none">${a.label}</span>`;
+}
+
 // ─── JOB STATUS ───────────────────────────────────
 const STATUS_CONFIG = {
   pending:  {cls:'st-pending',  label:'⏳ รอดำเนินการ'},
@@ -1315,9 +1408,10 @@ function renderCalendar() {
     const pills = jobs.slice(0,4).map(j => {
       const c = teamColor(j.team);
       const dotColor = STATUS_DOT[j.status||'pending'];
+      const actTag = j.action && ACTION_CONFIG[j.action] ? ACTION_CONFIG[j.action].short : '';
       return `<div class="cal-job-pill" style="background:${c}1a;color:${c};border-left-color:${c}"
         onclick="event.stopPropagation();openJobEdit('${j.id}')">
-        <span class="st-dot" style="background:${dotColor}"></span>${j.jobCode?j.jobCode+' ':''}${j.jobName.slice(0,14)}${j.jobName.length>14?'…':''}</div>`;
+        <span class="st-dot" style="background:${dotColor}"></span>${actTag?`<span style="font-size:9px;font-weight:800;opacity:.8">${actTag} </span>`:''}${j.jobCode?j.jobCode+' ':''}${j.jobName.slice(0,13)}${j.jobName.length>13?'…':''}</div>`;
     }).join('');
     const more = jobs.length>4 ? `<div class="cal-more">+${jobs.length-4} งาน</div>` : '';
     div.innerHTML = `<div class="cal-day-num">${dn}${holH}</div><div class="cal-jobs">${pills}${more}</div><button class="add-job-inline" title="เพิ่มงานวันที่ ${cell.day}">+</button>`;
@@ -1356,8 +1450,9 @@ function refreshPanel() {
         onclick="quickUpdateStatus('${j.id}','${k}')">${v.label}</button>`
     ).join('');
     return `<div class="day-job-card" style="border-left-color:${c}">
-      <div class="day-job-code">${j.jobCode||''} ${typeBadge(j.type)}</div>
+      <div class="day-job-code">${j.jobCode||''} ${typeBadge(j.type)} ${actionTagHtml(j.action)}</div>
       <div class="day-job-name">${j.jobName}</div>
+      ${j.action ? `<div style="margin-bottom:4px">${actionLabelHtml(j.action)}</div>` : ''}
       <div class="day-job-meta" style="margin-bottom:6px">
         ${emps ? `<span class="meta-chip">👤 ${emps}</span>` : ''}
         ${veh ? `<span class="meta-chip">🚗 ${veh}</span>` : ''}
@@ -1399,6 +1494,7 @@ function openAddJobModal(dateStr) {
   document.getElementById('jobNote').value = '';
   document.getElementById('jobStatusNote').value = '';
   initStatusButtons('pending');
+  initActionBtn('');
   document.getElementById('conflictBanner').classList.remove('show');
   populateDropdowns();
   document.getElementById('jobTeam').value = '';
@@ -1423,6 +1519,7 @@ function openJobEdit(id) {
   document.getElementById('jobNote').value = j.note || '';
   document.getElementById('jobStatusNote').value = j.statusNote || '';
   initStatusButtons(j.status || 'pending');
+  initActionBtn(j.action || '');
   document.getElementById('conflictBanner').classList.remove('show');
   populateDropdowns();
   document.getElementById('jobTeam').value = j.team || '';
@@ -1470,6 +1567,7 @@ function saveJob() {
   const note = document.getElementById('jobNote').value.trim();
   const status = document.getElementById('jobStatus').value || 'pending';
   const statusNote = document.getElementById('jobStatusNote').value.trim();
+  const action = document.getElementById('jobAction').value || '';
   const employees = [...document.querySelectorAll('#empSelectGrid input:checked')].map(i=>i.value);
   let jobCode='', jobName='';
   if (selMasterJobId) {
@@ -1487,7 +1585,7 @@ function saveJob() {
     document.getElementById('conflictMsg').textContent = conflicts[0] + (conflicts.length>1?` (+${conflicts.length-1} รายการ)`:'');
     document.getElementById('conflictBanner').classList.add('show');
   }
-  const rec = {id:editingJobId||uid(), masterJobId:selMasterJobId, jobCode, jobName, type, team, dates, employees, vehicleId:vehId, note, status, statusNote};
+  const rec = {id:editingJobId||uid(), masterJobId:selMasterJobId, jobCode, jobName, type, team, dates, employees, vehicleId:vehId, note, status, statusNote, action};
   if (editingJobId) {
     const idx = DB.scheduled.findIndex(j=>j.id===editingJobId);
     if (idx>=0) DB.scheduled[idx]=rec;
@@ -1632,32 +1730,39 @@ function openEmpSheet(empId, highlightDs) {
     document.getElementById('empSheetBody').innerHTML = dates.map(ds => {
       const isHL = ds === highlightDs;
       const jobs = dateMap[ds];
-      return `<div style="margin-bottom:14px">
-        <div class="sheet-day-header" style="${isHL?`color:${c};border-color:${c}50`:''}">
-          ${isHL?'📍 ':''} ${buildDayLabel(ds)}
-        </div>
-        ${jobs.map(j => {
-          const jc = teamColor(j.team);
-          const emps = j.employees.map(eid=>DB.employees.find(e=>e.id===eid)?.name||'?').join(', ');
-          const veh = j.vehicleId ? DB.vehicles.find(v=>v.id===j.vehicleId)?.plate||'' : '';
-          const jst = j.status||'pending';
-          const jstCfg = STATUS_CONFIG[jst]||STATUS_CONFIG.pending;
-          return `<div class="sheet-job-card" style="border-left-color:${jc}">
-            <div style="display:flex;align-items:center;gap:6px;margin-bottom:4px">
-              ${typeBadge(j.type)}
-              <span style="font-family:'IBM Plex Mono',monospace;font-size:11px;color:var(--text3)">${j.jobCode||''}</span>
-              <span class="status-badge ${jstCfg.cls}" style="font-size:10px;padding:1px 7px;margin-left:auto">${jstCfg.label}</span>
-            </div>
-            <div style="font-size:14px;font-weight:700;margin-bottom:5px">${j.jobName}</div>
-            ${j.statusNote?`<div style="font-size:12px;color:var(--amber);margin-bottom:4px">💬 ${j.statusNote}</div>`:''}
-            <div style="display:flex;flex-wrap:wrap;gap:5px">
-              ${emps?`<span class="meta-chip">👤 ${emps}</span>`:''}
-              ${veh?`<span class="meta-chip">🚗 ${veh}</span>`:''}
-              ${j.note?`<span class="meta-chip">📝 ${j.note}</span>`:''}
-            </div>
-          </div>`;
-        }).join('')}
-      </div>`;
+      const hdrStyle = isHL ? 'color:'+c+';border-color:'+c+'50' : '';
+      const pinIcon  = isHL ? '📍 ' : '';
+      const jobCards = jobs.map(j => {
+        const jc      = teamColor(j.team);
+        const emps    = j.employees.map(eid=>DB.employees.find(e=>e.id===eid)?.name||'?').join(', ');
+        const veh     = j.vehicleId ? DB.vehicles.find(v=>v.id===j.vehicleId)?.plate||'' : '';
+        const jstCfg  = STATUS_CONFIG[j.status||'pending'] || STATUS_CONFIG.pending;
+        const jact    = j.action && ACTION_CONFIG[j.action] ? ACTION_CONFIG[j.action] : null;
+        const actHtml = jact
+          ? '<div style="margin-bottom:6px"><span class="action-btn '+jact.cls+' sel" style="font-size:12px;padding:4px 14px;pointer-events:none">'+jact.label+'</span></div>'
+          : '';
+        const stNoteHtml = j.statusNote
+          ? '<div style="font-size:12px;color:var(--amber);margin-bottom:4px">💬 '+j.statusNote+'</div>'
+          : '';
+        const empsHtml = emps ? '<span class="meta-chip">👤 '+emps+'</span>' : '';
+        const vehHtml  = veh  ? '<span class="meta-chip">🚗 '+veh+'</span>'  : '';
+        const noteHtml = j.note ? '<span class="meta-chip">📝 '+j.note+'</span>' : '';
+        return '<div class="sheet-job-card" style="border-left-color:'+jc+'">'
+          + '<div style="display:flex;align-items:center;gap:6px;margin-bottom:6px">'
+          +   typeBadge(j.type)
+          +   '<span style="font-family:IBM Plex Mono,monospace;font-size:11px;color:var(--text3)">'+( j.jobCode||'')+'</span>'
+          +   '<span class="status-badge '+jstCfg.cls+'" style="font-size:10px;padding:1px 7px;margin-left:auto">'+jstCfg.label+'</span>'
+          + '</div>'
+          + actHtml
+          + '<div style="font-size:14px;font-weight:700;margin-bottom:5px">'+j.jobName+'</div>'
+          + stNoteHtml
+          + '<div style="display:flex;flex-wrap:wrap;gap:5px">'+empsHtml+vehHtml+noteHtml+'</div>'
+          + '</div>';
+      }).join('');
+      return '<div style="margin-bottom:14px">'
+        + '<div class="sheet-day-header" style="'+hdrStyle+'">'+pinIcon+buildDayLabel(ds)+'</div>'
+        + jobCards
+        + '</div>';
     }).join('');
   }
 
@@ -1694,10 +1799,13 @@ function buildDayLabel(ds) {
 function buildJobLines(jobs) {
   return jobs.map(j=>{
     const veh = j.vehicleId?DB.vehicles.find(v=>v.id===j.vehicleId)?.plate||'':'';
-    return `<div style="margin-left:6px;margin-bottom:3px;font-size:12px">
+    const actCfg = j.action && ACTION_CONFIG[j.action] ? ACTION_CONFIG[j.action] : null;
+    return `<div style="margin-left:6px;margin-bottom:5px;font-size:12px">
+      ${actCfg?`<span class="action-btn ${actCfg.cls} sel" style="font-size:11px;padding:2px 8px;pointer-events:none;margin-bottom:3px;display:inline-flex">${actCfg.label}</span><br>`:''}
       ${typeBadge(j.type)} <strong>${j.jobCode?j.jobCode+' ':''}${j.jobName}</strong>
       ${veh?`<span style="color:var(--text3);font-size:11px"> 🚗 ${veh}</span>`:''}
       ${j.note?`<span style="color:var(--text3);font-size:11px"> · ${j.note}</span>`:''}
+      ${j.statusNote?`<br><span style="color:var(--amber);font-size:11px">💬 ${j.statusNote}</span>`:''}
     </div>`;
   }).join('');
 }
@@ -2127,7 +2235,8 @@ function generateReport() {
         const emps = j.employees.map(eid=>DB.employees.find(e=>e.id===eid)?.name||'?').join(', ');
         const veh  = j.vehicleId ? DB.vehicles.find(v=>v.id===j.vehicleId)?.plate||'' : '';
         const stIco = {pending:'⏳',progress:'🔄',done:'✅',issue:'⚠️',cancel:'❌'}[j.status||'pending'];
-        lines.push(`  ${stIco} [${j.type||'?'}] ${j.jobCode?j.jobCode+' ':''}${j.jobName}`);
+        const actStr = j.action && ACTION_CONFIG[j.action] ? ' ['+ACTION_CONFIG[j.action].short+']' : '';
+        lines.push(`  ${stIco} [${j.type||'?'}]${actStr} ${j.jobCode?j.jobCode+' ':''}${j.jobName}`);
         if (emps) lines.push(`       👤 ${emps}`);
         if (veh)  lines.push(`       🚗 ${veh}`);
         if (j.statusNote) lines.push(`       💬 ${j.statusNote}`);
