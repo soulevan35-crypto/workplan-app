@@ -968,46 +968,58 @@ let syncTid  = null;
 // ── Pull: ดึงข้อมูลจาก Google Sheets ────────────
 async function pullCloud() {
   if (!GAS_URL || !GAS_ROOM) { setSyncUI('offline'); return; }
-  // ถ้าเพิ่ง push ไปไม่เกิน 5 วิ ข้ามการ pull (ข้อมูล local ใหม่กว่า)
-  if (Date.now() - lastPushTime < 5000) {
-    setSyncUI('ok');
-    return;
-  }
+  // ถ้าเพิ่ง push ไปไม่เกิน 5 วิ ข้ามการ pull
+  if (Date.now() - lastPushTime < 5000) { setSyncUI('ok'); return; }
   setSyncUI('saving');
   try {
-    const url = GAS_URL + '?room=' + encodeURIComponent(GAS_ROOM) + '&t=' + Date.now();
-    const res = await fetch(url);
+    const url = GAS_URL + '?action=load&room=' + encodeURIComponent(GAS_ROOM) + '&t=' + Date.now();
+    const res = await fetch(url, { method: 'GET' });
     if (!res.ok) { setSyncUI('err'); toast('Script error: ' + res.status, 'err'); return; }
     const json = await res.json();
-    if (!json.ok) { setSyncUI('err'); toast('API error: ' + json.error, 'err'); return; }
+    if (!json.ok) { setSyncUI('err'); toast('API error: ' + (json.error||'unknown'), 'err'); return; }
     if (json.data) {
-      DB = JSON.parse(json.data);
-      localStorage.setItem(STORAGE_KEY, JSON.stringify(DB));
-      setSyncUI('ok');
-      toast('ซิงค์สำเร็จ ✓ (' + (json.updated_at||'').slice(0,10) + ')', 'ok');
-      renderCurrentView();
+      try {
+        const remote = JSON.parse(json.data);
+        DB = remote;
+        localStorage.setItem(STORAGE_KEY, JSON.stringify(DB));
+        setSyncUI('ok');
+        const dt = (json.updated_at||'').slice(0,10);
+        toast('ซิงค์สำเร็จ ✓' + (dt?' ('+dt+')':''), 'ok');
+        renderCurrentView();
+      } catch(pe) { setSyncUI('err'); toast('ข้อมูล cloud เสียหาย', 'err'); }
     } else {
+      // ห้องใหม่ — push ขึ้นเลย
       await pushCloud(true);
     }
-  } catch(e) { setSyncUI('err'); toast('ซิงค์ผิดพลาด: ' + e.message, 'err'); }
+  } catch(e) {
+    setSyncUI('err');
+    toast('เชื่อมต่อไม่ได้: ' + e.message, 'err');
+    console.error('pullCloud error:', e);
+  }
 }
 
 // ── Push: บันทึกข้อมูลไป Google Sheets ──────────
+// ใช้ GET + URLSearchParams เพื่อหลีกเลี่ยง CORS preflight
+// ข้อมูลส่งผ่าน query string แบบ ?action=save&room=...&data=...
 async function pushCloud(silent) {
   if (!GAS_URL || !GAS_ROOM) return;
   setSyncUI('saving');
   try {
-    const res = await fetch(GAS_URL, {
-      method: 'POST',
-      headers: { 'Content-Type': 'text/plain' },
-      body: JSON.stringify({ room: GAS_ROOM, data: JSON.stringify(DB) })
-    });
+    const dataStr = encodeURIComponent(JSON.stringify(DB));
+    const roomStr = encodeURIComponent(GAS_ROOM);
+    const url = GAS_URL + '?action=save&room=' + roomStr + '&data=' + dataStr;
+    const res = await fetch(url, { method: 'GET' });
     if (!res.ok) { setSyncUI('err'); toast('บันทึกผิดพลาด: ' + res.status, 'err'); return; }
-    const json = await res.json();
-    if (!json.ok) { setSyncUI('err'); toast('บันทึก error: ' + json.error, 'err'); return; }
+    let json;
+    try { json = await res.json(); } catch { json = { ok: true }; }
+    if (json && json.ok === false) { setSyncUI('err'); toast('บันทึก error: ' + json.error, 'err'); return; }
     setSyncUI('ok');
-    if (!silent) toast('บันทึกแล้ว ✓', 'ok');
-  } catch(e) { setSyncUI('err'); toast('Push ผิดพลาด: ' + e.message, 'err'); }
+    if (!silent) toast('บันทึกขึ้น Cloud แล้ว ✓', 'ok');
+  } catch(e) {
+    setSyncUI('err');
+    toast('เชื่อมต่อไม่ได้: ' + e.message, 'err');
+    console.error('pushCloud error:', e);
+  }
 }
 
 let lastPushTime = 0; // ms timestamp ของ push ล่าสุด
