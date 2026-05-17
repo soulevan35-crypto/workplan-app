@@ -643,8 +643,9 @@ nav{flex:1;padding:8px 0;overflow-y:auto}
     <button class="modal-close" onclick="closeDayPanel()">✕</button>
   </div>
   <div class="day-panel-body" id="panelBody"></div>
-  <div class="day-panel-footer">
-    <button class="btn btn-primary" style="width:100%;justify-content:center" id="panelAddBtn">+ เพิ่มงานวันนี้</button>
+  <div class="day-panel-footer" style="display:flex;gap:8px">
+    <button class="btn btn-primary" style="flex:1;justify-content:center" id="panelAddBtn">+ เพิ่มงาน</button>
+    <button class="btn btn-ghost" style="flex:1;justify-content:center" onclick="forcePush()">☁️ บันทึก</button>
   </div>
 </div>
 </div><!-- appRoot -->
@@ -967,6 +968,11 @@ let syncTid  = null;
 // ── Pull: ดึงข้อมูลจาก Google Sheets ────────────
 async function pullCloud() {
   if (!GAS_URL || !GAS_ROOM) { setSyncUI('offline'); return; }
+  // ถ้าเพิ่ง push ไปไม่เกิน 5 วิ ข้ามการ pull (ข้อมูล local ใหม่กว่า)
+  if (Date.now() - lastPushTime < 5000) {
+    setSyncUI('ok');
+    return;
+  }
   setSyncUI('saving');
   try {
     const url = GAS_URL + '?room=' + encodeURIComponent(GAS_ROOM) + '&t=' + Date.now();
@@ -981,7 +987,6 @@ async function pullCloud() {
       toast('ซิงค์สำเร็จ ✓ (' + (json.updated_at||'').slice(0,10) + ')', 'ok');
       renderCurrentView();
     } else {
-      // ห้องใหม่ — push local ขึ้นก่อน
       await pushCloud(true);
     }
   } catch(e) { setSyncUI('err'); toast('ซิงค์ผิดพลาด: ' + e.message, 'err'); }
@@ -1005,16 +1010,25 @@ async function pushCloud(silent) {
   } catch(e) { setSyncUI('err'); toast('Push ผิดพลาด: ' + e.message, 'err'); }
 }
 
+let lastPushTime = 0; // ms timestamp ของ push ล่าสุด
+
 function scheduleSave() {
   localStorage.setItem(STORAGE_KEY, JSON.stringify(DB));
+  lastPushTime = Date.now(); // บันทึกเวลา push
   if (GAS_URL && GAS_ROOM) {
     clearTimeout(syncTid);
-    syncTid = setTimeout(pushCloud, 1500);
+    syncTid = setTimeout(pushCloud, 800); // push เร็วขึ้น
     setSyncUI('saving');
   }
 }
+
 function manualSync() {
   if (!GAS_URL || !GAS_ROOM) { toast('ยังไม่ได้ตั้งค่า Script URL', 'err'); return; }
+  // ถ้าเพิ่ง push ไปไม่เกิน 3 วิ ไม่ต้อง pull (กัน overwrite)
+  if (Date.now() - lastPushTime < 3000) {
+    toast('บันทึกแล้ว ✓ (ข้อมูลใหม่สุด)', 'ok');
+    return;
+  }
   pullCloud();
 }
 function setSyncUI(state) {
@@ -1335,10 +1349,12 @@ function statusBadgeHtml(status, note) {
 function quickUpdateStatus(jobId, newStatus) {
   const j = DB.scheduled.find(x=>x.id===jobId); if(!j) return;
   j.status = newStatus;
-  scheduleSave();
+  localStorage.setItem(STORAGE_KEY, JSON.stringify(DB));
+  lastPushTime = Date.now();
   renderCalendar();
   if (panelDate) refreshPanel();
   toast(STATUS_CONFIG[newStatus]?.label + ' ✓', 'ok');
+  if (GAS_URL && GAS_ROOM) pushCloud(true);
 }
 
 function saveStatusNote(jobId) {
@@ -1346,9 +1362,11 @@ function saveStatusNote(jobId) {
   const inp = document.getElementById('statusnote-'+jobId);
   if (!inp) return;
   j.statusNote = inp.value.trim();
-  scheduleSave();
+  localStorage.setItem(STORAGE_KEY, JSON.stringify(DB));
+  lastPushTime = Date.now();
   if (panelDate) refreshPanel();
   toast('บันทึกหมายเหตุแล้ว ✓','ok');
+  if (GAS_URL && GAS_ROOM) pushCloud(true);
 }
 
 // ─── CALENDAR ─────────────────────────────────────
@@ -1590,11 +1608,21 @@ function saveJob() {
     const idx = DB.scheduled.findIndex(j=>j.id===editingJobId);
     if (idx>=0) DB.scheduled[idx]=rec;
   } else { DB.scheduled.push(rec); }
-  scheduleSave();
+  // บันทึก local ก่อน
+  localStorage.setItem(STORAGE_KEY, JSON.stringify(DB));
+  lastPushTime = Date.now();
   closeModal('addJobModal');
-  toast(editingJobId ? 'แก้ไขงานแล้ว ✓' : 'เพิ่มงานแล้ว ✓', 'ok');
   renderCalendar();
   if (panelDate) refreshPanel();
+  // แล้วค่อย push cloud (non-blocking)
+  if (GAS_URL && GAS_ROOM) {
+    setSyncUI('saving');
+    pushCloud(false).then(()=>{
+      toast(editingJobId ? 'แก้ไขและบันทึกแล้ว ✓' : 'เพิ่มงานและบันทึกแล้ว ✓', 'ok');
+    });
+  } else {
+    toast(editingJobId ? 'แก้ไขงานแล้ว ✓' : 'เพิ่มงานแล้ว ✓', 'ok');
+  }
 }
 
 function delJob(id) {
@@ -2397,6 +2425,19 @@ function printReport() {
   document.getElementById('printArea').style.display = 'block';
   window.print();
   setTimeout(()=>{ document.getElementById('printArea').style.display='none'; }, 1000);
+}
+
+
+// ── Force push to cloud ──────────────────────────
+async function forcePush() {
+  if (!GAS_URL || !GAS_ROOM) {
+    toast('ข้อมูลบันทึกในเครื่องแล้ว (ไม่ได้เชื่อม cloud)', 'ok');
+    return;
+  }
+  lastPushTime = Date.now();
+  setSyncUI('saving');
+  await pushCloud(false);
+  toast('บันทึกขึ้น Cloud แล้ว ✓', 'ok');
 }
 
 // ─── BOOT ─────────────────────────────────────────
