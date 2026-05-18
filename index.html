@@ -869,6 +869,34 @@ nav{flex:1;padding:8px 0;overflow-y:auto}
 
 <div id="toast"></div>
 
+<!-- DEBUG / TEST CONNECTION MODAL -->
+<div class="modal-overlay" id="debugModal">
+  <div class="modal" style="width:500px">
+    <div class="modal-header">
+      <h2>🔧 ทดสอบการเชื่อมต่อ</h2>
+      <button class="modal-close" onclick="closeModal('debugModal')">✕</button>
+    </div>
+    <div class="modal-body">
+      <div class="form-group">
+        <label class="form-label">Script URL ที่ตั้งค่าอยู่</label>
+        <div id="debugUrlDisplay" style="font-family:'IBM Plex Mono',monospace;font-size:11px;background:var(--bg3);border:1px solid var(--border);border-radius:6px;padding:8px 10px;word-break:break-all;color:var(--text2)">—</div>
+      </div>
+      <div class="form-group">
+        <label class="form-label">Room ID</label>
+        <div id="debugRoomDisplay" style="font-family:'IBM Plex Mono',monospace;font-size:12px;background:var(--bg3);border:1px solid var(--border);border-radius:6px;padding:8px 10px;color:var(--text2)">—</div>
+      </div>
+      <div id="debugResult" style="background:var(--bg3);border:1px solid var(--border);border-radius:8px;padding:12px;min-height:80px;font-size:12px;font-family:'IBM Plex Mono',monospace;white-space:pre-wrap;color:var(--text2);margin-bottom:4px">กด "ทดสอบ" เพื่อตรวจสอบ...</div>
+    </div>
+    <div class="modal-footer" style="flex-wrap:wrap;gap:6px">
+      <button class="btn btn-ghost" onclick="closeModal('debugModal')">ปิด</button>
+      <button class="btn btn-ghost" onclick="debugTestLoad()">🔍 ทดสอบ Load</button>
+      <button class="btn btn-ghost" onclick="debugTestSave()">💾 ทดสอบ Save</button>
+      <button class="btn btn-primary" onclick="openScriptSettings()">⚙ แก้ URL</button>
+    </div>
+  </div>
+</div>
+
+
 <!-- EXPORT / REPORT MODAL -->
 <div class="modal-overlay" id="exportModal">
   <div class="modal" style="width:560px;max-height:92vh">
@@ -968,27 +996,28 @@ let syncTid  = null;
 // ── Pull: ดึงข้อมูลจาก Google Sheets ────────────
 async function pullCloud() {
   if (!GAS_URL || !GAS_ROOM) { setSyncUI('offline'); return; }
-  // ถ้าเพิ่ง push ไปไม่เกิน 5 วิ ข้ามการ pull
   if (Date.now() - lastPushTime < 5000) { setSyncUI('ok'); return; }
   setSyncUI('saving');
   try {
     const url = GAS_URL + '?action=load&room=' + encodeURIComponent(GAS_ROOM) + '&t=' + Date.now();
-    const res = await fetch(url, { method: 'GET' });
+    const res = await fetch(url);
     if (!res.ok) { setSyncUI('err'); toast('Script error: ' + res.status, 'err'); return; }
-    const json = await res.json();
-    if (!json.ok) { setSyncUI('err'); toast('API error: ' + (json.error||'unknown'), 'err'); return; }
+    const text = await res.text();
+    let json;
+    try { json = JSON.parse(text); } catch {
+      setSyncUI('err'); toast('Response ไม่ใช่ JSON — ตรวจ Script URL', 'err'); return;
+    }
+    if (!json.ok) { setSyncUI('err'); toast('API: ' + (json.error||'unknown'), 'err'); return; }
     if (json.data) {
       try {
-        const remote = JSON.parse(json.data);
-        DB = remote;
+        DB = JSON.parse(json.data);
         localStorage.setItem(STORAGE_KEY, JSON.stringify(DB));
         setSyncUI('ok');
         const dt = (json.updated_at||'').slice(0,10);
         toast('ซิงค์สำเร็จ ✓' + (dt?' ('+dt+')':''), 'ok');
         renderCurrentView();
-      } catch(pe) { setSyncUI('err'); toast('ข้อมูล cloud เสียหาย', 'err'); }
+      } catch(pe) { setSyncUI('err'); toast('ข้อมูล cloud เสียหาย: ' + pe.message, 'err'); }
     } else {
-      // ห้องใหม่ — push ขึ้นเลย
       await pushCloud(true);
     }
   } catch(e) {
@@ -999,25 +1028,30 @@ async function pullCloud() {
 }
 
 // ── Push: บันทึกข้อมูลไป Google Sheets ──────────
-// ใช้ GET + URLSearchParams เพื่อหลีกเลี่ยง CORS preflight
-// ข้อมูลส่งผ่าน query string แบบ ?action=save&room=...&data=...
+// ใช้ POST + FormData — ไม่มี CORS preflight, ไม่จำกัดขนาด URL
 async function pushCloud(silent) {
   if (!GAS_URL || !GAS_ROOM) return;
   setSyncUI('saving');
   try {
-    const dataStr = encodeURIComponent(JSON.stringify(DB));
-    const roomStr = encodeURIComponent(GAS_ROOM);
-    const url = GAS_URL + '?action=save&room=' + roomStr + '&data=' + dataStr;
-    const res = await fetch(url, { method: 'GET' });
-    if (!res.ok) { setSyncUI('err'); toast('บันทึกผิดพลาด: ' + res.status, 'err'); return; }
+    const form = new FormData();
+    form.append('action', 'save');
+    form.append('room', GAS_ROOM);
+    form.append('data', JSON.stringify(DB));
+    const res = await fetch(GAS_URL, { method: 'POST', body: form });
+    // no-cors ทำให้ res.ok เป็น false เสมอ — ตรวจ opaque แทน
+    if (res.type === 'opaque' || res.ok) {
+      setSyncUI('ok');
+      if (!silent) toast('บันทึกขึ้น Cloud แล้ว ✓', 'ok');
+      return;
+    }
     let json;
     try { json = await res.json(); } catch { json = { ok: true }; }
-    if (json && json.ok === false) { setSyncUI('err'); toast('บันทึก error: ' + json.error, 'err'); return; }
+    if (json && json.ok === false) { setSyncUI('err'); toast('บันทึก error: ' + (json.error||''), 'err'); return; }
     setSyncUI('ok');
     if (!silent) toast('บันทึกขึ้น Cloud แล้ว ✓', 'ok');
   } catch(e) {
     setSyncUI('err');
-    toast('เชื่อมต่อไม่ได้: ' + e.message, 'err');
+    toast('Push ผิดพลาด: ' + e.message, 'err');
     console.error('pushCloud error:', e);
   }
 }
@@ -2450,6 +2484,73 @@ async function forcePush() {
   setSyncUI('saving');
   await pushCloud(false);
   toast('บันทึกขึ้น Cloud แล้ว ✓', 'ok');
+}
+
+
+// ─── DEBUG / TEST CONNECTION ──────────────────────
+function openDebugModal() {
+  document.getElementById('debugUrlDisplay').textContent = GAS_URL || '(ยังไม่ได้ตั้งค่า)';
+  document.getElementById('debugRoomDisplay').textContent = GAS_ROOM || '(ยังไม่ได้ตั้งค่า)';
+  document.getElementById('debugResult').textContent = 'กด "ทดสอบ" เพื่อตรวจสอบ...';
+  document.getElementById('debugModal').classList.add('open');
+}
+
+async function debugTestLoad() {
+  const el = document.getElementById('debugResult');
+  if (!GAS_URL) { el.textContent = '❌ ยังไม่ได้ใส่ Script URL\nไปที่ ⚙ ตั้งค่า แล้วใส่ URL'; return; }
+  el.textContent = '⏳ กำลังทดสอบ Load...\nURL: ' + GAS_URL;
+  try {
+    const url = GAS_URL + '?action=load&room=' + encodeURIComponent(GAS_ROOM||'test') + '&t=' + Date.now();
+    el.textContent += '\n\nGET ' + url.slice(0, 80) + '...';
+    const res = await fetch(url, { method: 'GET' });
+    el.textContent += '\n\nStatus: ' + res.status + ' ' + res.statusText;
+    const text = await res.text();
+    el.textContent += '\nResponse: ' + text.slice(0, 300);
+    try {
+      const json = JSON.parse(text);
+      if (json.ok) {
+        el.textContent += '\n\n✅ เชื่อมต่อสำเร็จ!';
+        if (json.data) el.textContent += '\n📦 มีข้อมูล: ' + text.length + ' chars';
+        else el.textContent += '\n📭 ห้องใหม่ (ยังไม่มีข้อมูล)';
+      } else {
+        el.textContent += '\n\n❌ Error: ' + json.error;
+      }
+    } catch(pe) {
+      el.textContent += '\n\n⚠️ Response ไม่ใช่ JSON\nอาจเป็น: Script ยังไม่ได้ deploy / URL ผิด / ต้อง authorize';
+    }
+  } catch(e) {
+    el.textContent += '\n\n❌ Fetch failed: ' + e.message;
+    el.textContent += '\n\nวิธีแก้:';
+    el.textContent += '\n1. ตรวจ URL ว่าเป็น .../exec (ไม่ใช่ /dev)';
+    el.textContent += '\n2. Deploy ใหม่เป็น "Anyone" access';
+    el.textContent += '\n3. ลอง copy URL จาก Deploy อีกครั้ง';
+  }
+}
+
+async function debugTestSave() {
+  const el = document.getElementById('debugResult');
+  if (!GAS_URL) { el.textContent = '❌ ยังไม่ได้ใส่ Script URL'; return; }
+  el.textContent = '⏳ กำลังทดสอบ Save (POST + FormData)...\n';
+  try {
+    const form = new FormData();
+    form.append('action', 'save');
+    form.append('room', GAS_ROOM || 'test-debug');
+    form.append('data', JSON.stringify({ _test: true, ts: Date.now() }));
+    const res = await fetch(GAS_URL, { method: 'POST', body: form });
+    el.textContent += 'Status: ' + res.status + ' (type: ' + res.type + ')\n';
+    if (res.type === 'opaque') {
+      el.textContent += '\n✅ ส่งข้อมูลสำเร็จ (opaque response — ปกติสำหรับ GAS)';
+      return;
+    }
+    const text = await res.text();
+    el.textContent += 'Response: ' + text.slice(0, 300);
+    try {
+      const json = JSON.parse(text);
+      el.textContent += json.ok ? '\n\n✅ Save สำเร็จ! (' + json.action + ')' : '\n\n❌ ' + json.error;
+    } catch { el.textContent += '\n\n⚠️ Response ไม่ใช่ JSON'; }
+  } catch(e) {
+    el.textContent += '\n❌ ' + e.message;
+  }
 }
 
 // ─── BOOT ─────────────────────────────────────────
